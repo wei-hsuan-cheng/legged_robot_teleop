@@ -26,10 +26,13 @@ The GUI and MPC use normalized velocity/yaw fields and absolute height in meters
 
 ## Safety Design
 
-L1 is a deadman and requires release then press with centered enabled axes and released height controls.
-Circle clears permission to move; releasing L1 or a 0.25-second input timeout also zeros velocity while preserving height.
+L2 is the deadman and requires release then press with centered enabled axes and released height controls.
+The user changed it from the initial L1 mapping before their robot acceptance test.
+Standard `game_controller_node` reports L2 as axis 4, 0 released to -1 pressed, so `sign_enable` is -1.
+Engage at pressure 0.5 and disengage/re-arm at 0.2, with hysteresis and no need for an L1 button mapping.
+Circle clears permission to move; releasing L2 or a 0.25-second input timeout also zeros velocity while preserving height.
 Malformed Joy arrays, nonfinite values, invalid button values, and out-of-range axes disarm.
-Reconnect with L1 held cannot auto-enable.
+Reconnect with L2 held cannot auto-enable.
 The timer uses a steady clock and the watchdog uses monotonic receipt time, independent of ROS simulation time.
 Default speed fractions are 0.25 in each direction; existing MPC command conditioning remains unchanged.
 Profile launch reads the selected controller YAML for height bounds and disables lateral input when its physical limit is zero, including Upkie.
@@ -48,6 +51,9 @@ Installed robot launch argument discovery confirms `baseCommandDevice` and the t
 All 39 package checks passed again after relocation, with no warnings after running Python lint before the DDS test.
 The three input-selection checks plus seven MPC package-health checks passed (10 total).
 No live-device launch, robot simulation, or production command publishing is performed during this build-only checkpoint.
+L2-specific regression coverage includes gradual presses, hysteresis, timeout/stop re-arming, missing trigger axes, and L1 not enabling motion.
+After the L2 change, the package rebuilt and all 48 checks passed without warnings (38 control, seven profile, one DDS transport, two lint).
+The user requested pushing this change and the pending MPC launch/VCS/docs integration to their respective branches.
 Robot driving, cable-unplug response with a live gamepad, and Bluetooth need user acceptance after the topic checks.
 Do not start a robot or publish to `/humanoid/walking_velocity_command` during isolated checks.
 

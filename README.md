@@ -32,17 +32,19 @@ See [connection and testing](docs/testing.md) for USB, Docker, isolated topic ch
 
 | Control | Action |
 | --- | --- |
-| L1 held | Enable motion after releasing L1 and centering both sticks |
+| L2 held | Enable motion after releasing L2 and centering both sticks |
 | Left stick | Forward/backward and left/right |
 | Right stick horizontal | Yaw rate |
-| D-pad up/down, with L1 | Increase/decrease base height |
-| Triangle, with L1 | Restore nominal base height |
-| Circle | Stop velocity commands; release L1 before enabling again |
-| Release L1 or lose input | Zero velocity/yaw, keep the selected height |
+| D-pad up/down, with L2 | Increase/decrease base height |
+| Triangle, with L2 | Restore nominal base height |
+| Circle | Stop velocity commands; release L2 before enabling again |
+| Release L2 or lose input | Zero velocity/yaw, keep the selected height |
 
 The default speed scales are 25% of the MPC's configured maximum speeds.
 Upkie's robot profile disables independent sideways commands.
-Input loss longer than 0.25 wall seconds disarms motion; reconnection with L1 held cannot restart it.
+Input loss longer than 0.25 wall seconds disarms motion; reconnection with L2 held cannot restart it.
+L2 is axis 4, reported by `game_controller_node` as 0 released to -1 fully pressed.
+The deadman engages at 50% of that ROS range and releases at 20%, avoiding threshold chatter.
 Centered sticks and released height buttons are required at the instant of enabling.
 This is not a hardware emergency stop and does not deactivate the MPC.
 
@@ -97,7 +99,7 @@ Output velocities are normalized fractions within `[-1, 1]`, not physical m/s or
 Output QoS is best effort, volatile, depth 1; input accepts best-effort or reliable Joy publishers.
 Only one base-command source may publish at once; disable the GUI and scripted targets before using teleop.
 Axis/button mapping and safety parameters are read-only after startup; restart to apply a new mapping.
-Optional axis and height-button indices can be `-1` to disable them; enable and stop buttons are always required.
+Optional motion-axis and height-button indices can be `-1` to disable them; the enable axis and stop button are always required.
 
 
 ## Tests

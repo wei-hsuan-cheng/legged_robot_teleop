@@ -57,7 +57,8 @@ ros2 run joy game_controller_node --ros-args \
 
 In another sourced terminal, run `ros2 topic echo /joy`.
 Check each stick and button, then Ctrl+C both commands before launching the combined teleop launch.
-The [driver mapping](https://github.com/ros-drivers/joystick_drivers/blob/ros2/joy/README.md) assigns left/right sticks to axes `[0, 1]` and `[2, 3]`, L1 to button 9, Circle to 1, Triangle to 3, and D-pad up/down to 11/12.
+The [driver mapping](https://github.com/ros-drivers/joystick_drivers/blob/ros2/joy/README.md) assigns left/right sticks to axes `[0, 1]` and `[2, 3]`, L2 to axis 4, Circle to button 1, Triangle to 3, and D-pad up/down to 11/12.
+Check that L2 changes from 0 released toward -1 fully pressed; L1 is not the deadman.
 Use the actual enumerated device name if it differs over Bluetooth.
 
 
@@ -80,13 +81,14 @@ ros2 topic echo /teleop/test/walking_velocity_command \
   --qos-reliability best_effort
 ```
 
-Release L1, center sticks, then hold L1 and move them.
+Release L2, center sticks, then hold L2 and move them.
+Enable occurs at 50% of the ROS trigger range; release to 20% or below to disable and re-arm.
 Full forward produces `linear_velocity_x: 0.25`; full left produces `linear_velocity_y: 0.25`; right stick left produces positive yaw.
-H2 starts at the nominal height from its installed YAML; D-pad changes it only while L1 is held.
-Release L1 and check zero velocity/yaw with unchanged height.
-Press Circle while holding L1 and check that motion cannot resume until L1 is released and pressed again with centered sticks.
+H2 starts at the nominal height from its installed YAML; D-pad changes it only while L2 is held.
+Release L2 and check zero velocity/yaw with unchanged height.
+Press Circle while holding L2 and check that motion cannot resume until L2 is released and pressed again with centered sticks.
 Unplug the cable while commanding motion: output should become zero within approximately 0.25 seconds plus one publish interval, subject to host scheduling.
-Reconnect with L1 held and check that it stays disabled until released and enabled again.
+Reconnect with L2 held and check that it stays disabled until released and enabled again.
 This timeout covers loss of Joy input while teleop is alive, not a killed process or DDS/network failure downstream.
 Do not rely on one final best-effort shutdown packet as an emergency stop.
 
@@ -107,7 +109,7 @@ ros2 launch legged_robot_mpc_controller robot.launch.py \
 ```
 
 This starts the gamepad driver and adapter, suppresses the GUI, and shares the robot's height settings automatically.
-Wait for stable standing before enabling L1.
+Wait for stable standing before enabling L2.
 For independent teleop launch, start the robot without either input frontend:
 
 ```bash
@@ -123,7 +125,7 @@ ros2 launch legged_robot_teleop teleop.launch.py robotName:=h2
 ```
 
 Test small forward/backward motions first, then yaw, sideways motion, and small height changes.
-Release L1 between each test.
+Release L2 between each test.
 Repeat the release and disconnect checks in simulation.
 For G1 use `robotName:=g1` in both launches; for Upkie use `robotName:=upkie`, `mpcFreq:=200`, and wait for its stand-up sequence before enabling teleop.
 Upkie supports forward/yaw/height but not independent sideways drive.

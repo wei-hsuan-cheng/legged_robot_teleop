@@ -44,7 +44,8 @@ class BaseTwistTeleop(Node):
         )
         self.get_logger().info(
             f'Output: {self._publisher.topic_name}. Disable other command publishers. '
-            'Release L1, center sticks, then hold L1 to drive. Circle stops motion.',
+            'Release the enable trigger, center sticks, then hold it to drive '
+            '(DualSense default: L2). Circle stops motion.',
         )
 
     def _receive(self, message):

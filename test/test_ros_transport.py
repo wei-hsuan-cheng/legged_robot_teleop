@@ -38,13 +38,14 @@ def test_transport_and_timeout_with_no_simulation_clock():
     executor.add_node(teleop)
     executor.add_node(probe)
 
-    def pump(duration, axes=None, pressed=()):
+    def pump(duration, axes=None, pressed=(), pressure=0.0):
         end = time.monotonic() + duration
         next_send = 0.0
         while time.monotonic() < end:
             if axes is not None and time.monotonic() >= next_send:
                 message = Joy()
                 message.axes = list(axes)
+                message.axes[4] = -pressure
                 message.buttons = [int(i in pressed) for i in range(15)]
                 publisher.publish(message)
                 next_send = time.monotonic() + 0.02
@@ -53,9 +54,9 @@ def test_transport_and_timeout_with_no_simulation_clock():
     try:
         pump(0.5, [0.0] * 6)
         assert received and received[-1].linear_velocity_x == 0.0
-        pump(0.1, [0.0] * 6, (9,))
+        pump(0.1, [0.0] * 6, pressure=1.0)
         assert teleop.control.enabled
-        pump(0.15, [0.0, 1.0, 0.5, 0.0, 0.0, 0.0], (9,))
+        pump(0.15, [0.0, 1.0, 0.5, 0.0, 0.0, 0.0], pressure=1.0)
         assert received[-1].linear_velocity_x == 0.25
         assert received[-1].angular_velocity_z == 0.125
         assert received[-1].desired_pelvis_height == 0.6
@@ -65,12 +66,12 @@ def test_transport_and_timeout_with_no_simulation_clock():
         assert received[-1].linear_velocity_x == 0.0
         assert received[-1].angular_velocity_z == 0.0
         assert teleop.control.state == 'input_timeout'
-        pump(0.1, [0.0] * 6, (9,))
+        pump(0.1, [0.0] * 6, pressure=1.0)
         assert not teleop.control.enabled
         pump(0.1, [0.0] * 6)
-        pump(0.1, [0.0] * 6, (9,))
+        pump(0.1, [0.0] * 6, pressure=1.0)
         assert teleop.control.enabled
-        pump(0.1, [0.0, 1.0, 0.0, 0.0, 0.0, 0.0], (9,))
+        pump(0.1, [0.0, 1.0, 0.0, 0.0, 0.0, 0.0], pressure=1.0)
         assert received[-1].linear_velocity_x > 0
         pump(0.1, [0.0] * 6)
         assert received[-1].linear_velocity_x == 0

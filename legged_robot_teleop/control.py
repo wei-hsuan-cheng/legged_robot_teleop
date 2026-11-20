@@ -12,13 +12,16 @@ class Settings:
     axis_forward: int = 1
     axis_lateral: int = 0
     axis_yaw: int = 2
+    axis_enable: int = 4
     sign_forward: float = 1.0
     sign_lateral: float = 1.0
     sign_yaw: float = 1.0
+    sign_enable: float = -1.0
     scale_forward: float = 0.25
     scale_lateral: float = 0.25
     scale_yaw: float = 0.25
-    button_enable: int = 9
+    enable_threshold: float = 0.5
+    release_threshold: float = 0.2
     button_stop: int = 1
     button_height_up: int = 11
     button_height_down: int = 12
@@ -38,14 +41,19 @@ class Settings:
                     raise ValueError(f'{name} must be an integer >= -1')
             elif not math.isfinite(value):
                 raise ValueError(f'{name} must be finite')
-        if self.button_enable < 0 or self.button_stop < 0:
-            raise ValueError('Enable and stop buttons cannot be disabled')
+        if self.axis_enable < 0 or self.button_stop < 0:
+            raise ValueError('Enable axis and stop button cannot be disabled')
+        if self.axis_enable in (self.axis_forward, self.axis_lateral, self.axis_yaw):
+            raise ValueError('Enable axis must be separate from motion axes')
+        if not 0 <= self.release_threshold < self.enable_threshold <= 1:
+            raise ValueError('Require 0 <= release_threshold < enable_threshold <= 1')
         buttons = [v for k, v in vars(self).items() if k.startswith('button_') and v >= 0]
         if len(set(buttons)) != len(buttons):
             raise ValueError('Button assignments must be distinct')
-        for name in ('forward', 'lateral', 'yaw'):
+        for name in ('forward', 'lateral', 'yaw', 'enable'):
             if getattr(self, 'sign_' + name) not in (-1.0, 1.0):
                 raise ValueError('Axis signs must be -1 or 1')
+        for name in ('forward', 'lateral', 'yaw'):
             if not 0.0 <= getattr(self, 'scale_' + name) <= 1.0:
                 raise ValueError('Normalized velocity scales must be within [0, 1]')
         if not 0 < self.minimum_height <= self.reference_height <= self.maximum_height:
@@ -97,12 +105,12 @@ class TeleopControl:
             self.stop('input_timeout')
         axis_indices = (s.axis_forward, s.axis_lateral, s.axis_yaw)
         button_indices = (
-            s.button_enable, s.button_stop, s.button_height_up,
+            s.button_stop, s.button_height_up,
             s.button_height_down, s.button_height_reset,
         )
         valid = (
             math.isfinite(now)
-            and all(i < len(axes) for i in axis_indices)
+            and all(i < len(axes) for i in (*axis_indices, s.axis_enable))
             and all(i < len(buttons) for i in button_indices)
             and all(math.isfinite(a) and abs(a) <= 1.0001 for a in axes)
             and all(b in (0, 1) for b in buttons)
@@ -122,11 +130,17 @@ class TeleopControl:
         if pressed(s.button_stop):
             self.stop('stop_button')
             return
-        if not pressed(s.button_enable):
+        pressure = max(0.0, min(1.0, s.sign_enable * axes[s.axis_enable]))
+        if pressure <= s.release_threshold:
             self.stop('disabled')
             self._released = True
             return
-        height_buttons = tuple(pressed(i) for i in button_indices[2:])
+        if not self.enabled and pressure < s.enable_threshold:
+            self.state = (
+                'press_trigger_to_enable' if self._released else 'release_and_center_to_enable'
+            )
+            return
+        height_buttons = tuple(pressed(i) for i in button_indices[1:])
         active_axes = [
             a for a, scale in zip(values, (s.scale_forward, s.scale_lateral, s.scale_yaw))
             if scale > 0
