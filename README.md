@@ -50,6 +50,9 @@ Centered sticks and released Center/height buttons are required at the instant o
 Center requires L2 at or below its release threshold and a fresh L1 press.
 L1 presses during driving or partial trigger presses are ignored, not queued for later.
 Release L1 before re-enabling L2.
+L1 release and a neutral L2 press may arrive in the same input message; no extra both-released frame is required after Center.
+An enable attempt with deflected sticks or held L1/D-pad is rejected until L2 is released and pressed again.
+See [enable states and diagnostics](docs/enable_fsm.md) for the complete transition table and recovery instructions.
 This is not a hardware emergency stop and does not deactivate the MPC.
 
 
@@ -100,7 +103,9 @@ See the [upstream driver documentation](https://github.com/ros-drivers/joystick_
 
 Output velocities are normalized fractions within `[-1, 1]`, not physical m/s or rad/s.
 `desired_pelvis_height` is an absolute height in meters, matching the GUI contract.
-Output QoS is best effort, volatile, depth 1; input accepts best-effort or reliable Joy publishers.
+The bundled driver uses `<joyTopic>/raw`; the adapter subscribes with best effort and exposes the unchanged joystick data on public `joyTopic` with best effort, volatile, depth 1.
+Commands and `~/status` diagnostics also use best effort, volatile, depth 1.
+With `startJoy:=false`, the adapter directly consumes the external topic using best effort; that external publisher's QoS is not changed.
 Only one base-command source may publish at once; disable the GUI and scripted targets before using teleop.
 Axis/button mapping and safety parameters are read-only after startup; restart to apply a new mapping.
 Optional motion-axis and height-button indices can be `-1` to disable them; the enable axis and stop button are always required.
@@ -114,5 +119,6 @@ colcon test-result --verbose
 ```
 
 Unit tests cover signs/scaling, height bounds, release/stop, malformed input, timeouts, and reconnection.
+FSM regressions cover post-Center re-enabling, trigger hysteresis, blocked-input recovery, clock faults, and 6,000 deterministic randomized input steps.
 The ROS transport test uses its own ROS domain and unique test topics, including a paused simulation clock with no `/clock` publisher.
 It never sends robot commands or starts a simulation.

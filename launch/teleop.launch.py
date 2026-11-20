@@ -28,6 +28,9 @@ def _nodes(context):
     )
     if not lateral_enabled:
         profile['scale_lateral'] = 0.0
+    start_joy = IfCondition(LaunchConfiguration('startJoy')).evaluate(context)
+    joy_topic = value('joyTopic')
+    driver_topic = joy_topic.rstrip('/') + '/raw'
     return [
         Node(
             package='joy', executable='game_controller_node', name='game_controller_node',
@@ -39,12 +42,13 @@ def _nodes(context):
                 'autorepeat_rate': 50.0,
                 'sticky_buttons': False,
             }],
-            remappings=[('joy', value('joyTopic'))],
+            remappings=[('joy', driver_topic)],
         ),
         Node(
             package='legged_robot_teleop', executable='base_twist', name='base_twist_teleop',
             output='screen', parameters=[value('paramsFile'), profile, {
-                'joy_topic': value('joyTopic'),
+                'joy_topic': joy_topic,
+                'joy_source_topic': driver_topic if start_joy else joy_topic,
                 'command_topic': value('commandTopic'),
                 'use_sim_time': ParameterValue(
                     LaunchConfiguration('use_sim_time'), value_type=bool,

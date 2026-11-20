@@ -258,3 +258,20 @@ def test_stop_has_priority_over_center():
     command = control.command(0.07)
     assert command.height == height
     assert command.forward == 0
+
+
+def test_center_release_and_l2_press_can_arrive_in_the_same_frame():
+    control = TeleopControl(Settings())
+    control.receive(*sample(9), 0.0)
+    assert not control.enabled
+    control.receive(*sample(pressure=1.0), 0.01)
+    assert control.enabled
+
+
+def test_center_release_during_gradual_l2_press_preserves_ready_state():
+    control = TeleopControl(Settings())
+    control.receive(*sample(9), 0.0)
+    control.receive(*sample(pressure=0.3), 0.01)
+    assert not control.enabled
+    control.receive(*sample(pressure=0.6), 0.02)
+    assert control.enabled

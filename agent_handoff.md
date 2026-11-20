@@ -77,3 +77,24 @@ Do not start a robot or publish to `/humanoid/walking_velocity_command` during i
 2. User-controlled flat-ground simulation with `baseCommandDevice:=joystick`.
 3. Optional persistent Docker input hotplug configuration, without disrupting current robot jobs.
 4. Optional direct Ubuntu Bluetooth pairing and repeated disconnect acceptance.
+
+
+## Explicit Enable FSM and Joystick QoS
+
+The user reported intermittent L2 enabling and restricted this work to `legged_robot_teleop`; the MPC repository is not modified.
+Two new regression tests reproduced an old implementation failure before the fix: Center followed by L1 release and L2 press in the same input snapshot, or L1 release during a gradual L2 press, both failed to enable despite neutral controls.
+The implicit `enabled`/`_released` combination is replaced by one `EnableState`: `WAIT_RELEASE`, `READY`, or `ENABLED`.
+L2 release qualifies READY even with Center held, while the actual enable press still requires L1/D-pad released and neutral axes.
+Unsafe enable attempts, stop, malformed input, stale input, and invalid time require a fresh L2 release; clearing a blocked control while keeping L2 held cannot auto-enable.
+L2 thresholds, the 0.25-second timeout, 100 Hz command publishing, full speed fractions, and 0.2 m/s height rate are unchanged.
+Blocked reasons remain latched until a valid release and are logged with the phase and trigger pressure.
+Best-effort `~/status` publishes a JSON diagnostic on reason changes and once per second.
+The standard driver now outputs to `<joyTopic>/raw`; the same adapter node subscribes best effort at depth 1 and republishes public `joyTopic` best effort at depth 1, without modifying the driver or adding a process.
+The standard driver's raw publisher retains its original QoS; external drivers used with `startJoy:=false` keep their own publisher QoS.
+Tests cover direct and bridged real DDS paths, public publisher reliability, local depth-1 profiles, no alias-induced relay loop, and 6,000 randomized safety-invariant steps.
+Some DDS discovery implementations report history depth as zero, so tests check reliability through discovery and depth through the actual rclpy publisher profile.
+See [FSM documentation](docs/enable_fsm.md) for exact transition and recovery rules.
+The package rebuilt successfully and all 78 checks passed before the user requested no further testing.
+The two post-Center regressions failed on the prior implementation and passed on the explicit FSM.
+No robot was started, no production commands were published, and the MPC repository remained unchanged.
+Further testing stopped at the user's request; restart teleop to load the changes.

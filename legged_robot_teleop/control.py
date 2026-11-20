@@ -1,6 +1,7 @@
 """ROS-independent input validation, deadman control, and height integration."""
 
 from dataclasses import dataclass
+from enum import Enum
 import math
 from typing import Sequence
 
@@ -76,6 +77,14 @@ class Command:
     height: float
 
 
+class EnableState(Enum):
+    """Single source of truth for trigger permission, separate from status reasons."""
+
+    WAIT_RELEASE = 'wait_release'
+    READY = 'ready'
+    ENABLED = 'enabled'
+
+
 class TeleopControl:
     """Require fresh input and a neutral release/press sequence before motion."""
 
@@ -83,25 +92,45 @@ class TeleopControl:
         self.settings = settings
         self.height = settings.reference_height
         self.state = 'waiting_for_input'
-        self.enabled = False
-        self._released = False
+        self._enable_state = EnableState.WAIT_RELEASE
+        self.last_trigger_pressure = 0.0
         self._last_input = None
         self._last_tick = None
         self._axes = (0.0, 0.0, 0.0)
         self._buttons = (False, False)
         self._center_pressed = False
 
+    @property
+    def enable_state(self):
+        """Return the explicit enable FSM state."""
+        return self._enable_state
+
+    @property
+    def enabled(self):
+        """Derive motion permission from the FSM rather than a second flag."""
+        return self._enable_state is EnableState.ENABLED
+
+    def _transition(self, mode, reason):
+        self._enable_state = mode
+        self.state = reason
+        if mode is not EnableState.ENABLED:
+            self._axes = (0.0, 0.0, 0.0)
+            self._buttons = (False, False)
+
     def stop(self, state='disabled'):
         """Clear permission to move without changing the selected height."""
-        self.enabled = False
-        self._released = False
-        self._axes = (0.0, 0.0, 0.0)
-        self._buttons = (False, False)
-        self.state = state
+        self._transition(EnableState.WAIT_RELEASE, state)
 
     def receive(self, axes: Sequence[float], buttons: Sequence[int], now: float):
         """Validate input and update the enable state using monotonic receipt time."""
         s = self.settings
+        if (not math.isfinite(now)
+                or (self._last_input is not None and now < self._last_input)
+                or (self._last_tick is not None and now < self._last_tick)):
+            self.stop('invalid_time')
+            self._last_input = None
+            self._last_tick = None
+            return
         if self._last_input is not None and now - self._last_input >= s.input_timeout:
             self.stop('input_timeout')
         axis_indices = (s.axis_forward, s.axis_lateral, s.axis_yaw)
@@ -110,8 +139,7 @@ class TeleopControl:
             s.button_height_down, s.button_center,
         )
         valid = (
-            math.isfinite(now)
-            and all(i < len(axes) for i in (*axis_indices, s.axis_enable))
+            all(i < len(axes) for i in (*axis_indices, s.axis_enable))
             and all(i < len(buttons) for i in button_indices)
             and all(math.isfinite(a) and abs(a) <= 1.0001 for a in axes)
             and all(b in (0, 1) for b in buttons)
@@ -132,36 +160,47 @@ class TeleopControl:
             max(-1.0, min(1.0, axes[i])) if i >= 0 else 0.0 for i in axis_indices
         )
         self._last_input = now
+        pressure = max(0.0, min(1.0, s.sign_enable * axes[s.axis_enable]))
+        self.last_trigger_pressure = pressure
         if pressed(s.button_stop):
             self.stop('stop_button')
             return
-        pressure = max(0.0, min(1.0, s.sign_enable * axes[s.axis_enable]))
+        height_buttons = tuple(pressed(i) for i in button_indices[1:3])
+        if center_pressed:
+            blocker = 'center_held'
+        elif any(height_buttons):
+            blocker = 'height_buttons_held'
+        elif any(
+            abs(a) > s.neutral_threshold
+            for a, scale in zip(values, (s.scale_forward, s.scale_lateral, s.scale_yaw))
+            if scale > 0
+        ):
+            blocker = 'sticks_not_centered'
+        else:
+            blocker = ''
+
         if pressure <= s.release_threshold:
-            self.stop('disabled')
-            self._released = not center_pressed
+            # A released trigger qualifies READY even during Center. A later snapshot
+            # may contain both the Center release and the safe L2 press.
+            self._transition(EnableState.READY, blocker or 'ready')
             if center_edge:
                 self.height = s.reference_height
                 self.state = 'centered'
             return
-        if not self.enabled and pressure < s.enable_threshold:
-            self.state = (
-                'press_trigger_to_enable' if self._released else 'release_and_center_to_enable'
-            )
+
+        if self.enable_state is EnableState.WAIT_RELEASE:
+            if self.state == 'waiting_for_input':
+                self.state = 'release_trigger_to_enable'
             return
-        height_buttons = tuple(pressed(i) for i in button_indices[1:3])
-        active_axes = [
-            a for a, scale in zip(values, (s.scale_forward, s.scale_lateral, s.scale_yaw))
-            if scale > 0
-        ]
-        if not self.enabled:
-            if (not self._released
-                    or any(abs(a) > s.neutral_threshold for a in active_axes)
-                    or any(height_buttons) or center_pressed):
-                self._released = False
-                self.state = 'release_and_center_to_enable'
+
+        if self.enable_state is EnableState.READY:
+            if pressure < s.enable_threshold:
+                self.state = blocker or 'ready'
                 return
-            self.enabled = True
-            self._released = False
+            if blocker:
+                self.stop('enable_blocked_' + blocker)
+                return
+            self._transition(EnableState.ENABLED, 'enabled')
             self._last_tick = now
         self._axes = values
         self._buttons = height_buttons
@@ -170,6 +209,13 @@ class TeleopControl:
     def command(self, now: float) -> Command:
         """Return a safe command even when the ROS simulation clock is paused."""
         s = self.settings
+        if (not math.isfinite(now)
+                or (self._last_tick is not None and now < self._last_tick)
+                or (self._last_input is not None and now < self._last_input)):
+            self.stop('invalid_time')
+            self._last_input = None
+            self._last_tick = None
+            return Command(0.0, 0.0, 0.0, self.height)
         dt = 0.0 if self._last_tick is None else max(0.0, now - self._last_tick)
         self._last_tick = now
         if self._last_input is not None and now - self._last_input >= s.input_timeout:

@@ -97,6 +97,9 @@ This timeout covers loss of Joy input while teleop is alive, not a killed proces
 Do not rely on one final best-effort shutdown packet as an emergency stop.
 
 If a driver is already running, use `startJoy:=false` and its actual `joyTopic` instead of starting a duplicate driver.
+With the bundled driver, `joyTopic` is a best-effort public output; the driver's original stream is on `<joyTopic>/raw`.
+Use `ros2 topic info /teleop/test/joy --verbose` to inspect the public publisher QoS in this example.
+If L2 does not enable, inspect the [FSM status and recovery instructions](enable_fsm.md) rather than increasing the timeout or relaxing the neutral-stick guard blindly.
 
 
 ## 5. Robot Simulation
