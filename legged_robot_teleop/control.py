@@ -25,7 +25,7 @@ class Settings:
     button_stop: int = 1
     button_height_up: int = 11
     button_height_down: int = 12
-    button_height_reset: int = 3
+    button_center: int = 9
     reference_height: float = 0.6
     minimum_height: float = 0.2
     maximum_height: float = 1.0
@@ -88,14 +88,15 @@ class TeleopControl:
         self._last_input = None
         self._last_tick = None
         self._axes = (0.0, 0.0, 0.0)
-        self._buttons = (False, False, False)
+        self._buttons = (False, False)
+        self._center_pressed = False
 
     def stop(self, state='disabled'):
         """Clear permission to move without changing the selected height."""
         self.enabled = False
         self._released = False
         self._axes = (0.0, 0.0, 0.0)
-        self._buttons = (False, False, False)
+        self._buttons = (False, False)
         self.state = state
 
     def receive(self, axes: Sequence[float], buttons: Sequence[int], now: float):
@@ -106,7 +107,7 @@ class TeleopControl:
         axis_indices = (s.axis_forward, s.axis_lateral, s.axis_yaw)
         button_indices = (
             s.button_stop, s.button_height_up,
-            s.button_height_down, s.button_height_reset,
+            s.button_height_down, s.button_center,
         )
         valid = (
             math.isfinite(now)
@@ -123,6 +124,10 @@ class TeleopControl:
         def pressed(index):
             return index >= 0 and bool(buttons[index])
 
+        # Consume presses even while driving; never replay a held Center on release.
+        center_pressed = pressed(s.button_center)
+        center_edge = center_pressed and not self._center_pressed
+        self._center_pressed = center_pressed
         values = tuple(
             max(-1.0, min(1.0, axes[i])) if i >= 0 else 0.0 for i in axis_indices
         )
@@ -133,14 +138,17 @@ class TeleopControl:
         pressure = max(0.0, min(1.0, s.sign_enable * axes[s.axis_enable]))
         if pressure <= s.release_threshold:
             self.stop('disabled')
-            self._released = True
+            self._released = not center_pressed
+            if center_edge:
+                self.height = s.reference_height
+                self.state = 'centered'
             return
         if not self.enabled and pressure < s.enable_threshold:
             self.state = (
                 'press_trigger_to_enable' if self._released else 'release_and_center_to_enable'
             )
             return
-        height_buttons = tuple(pressed(i) for i in button_indices[1:])
+        height_buttons = tuple(pressed(i) for i in button_indices[1:3])
         active_axes = [
             a for a, scale in zip(values, (s.scale_forward, s.scale_lateral, s.scale_yaw))
             if scale > 0
@@ -148,7 +156,7 @@ class TeleopControl:
         if not self.enabled:
             if (not self._released
                     or any(abs(a) > s.neutral_threshold for a in active_axes)
-                    or any(height_buttons)):
+                    or any(height_buttons) or center_pressed):
                 self._released = False
                 self.state = 'release_and_center_to_enable'
                 return
@@ -168,13 +176,10 @@ class TeleopControl:
             self.stop('input_timeout')
         if not self.enabled:
             return Command(0.0, 0.0, 0.0, self.height)
-        up, down, reset = self._buttons
-        if reset:
-            self.height = s.reference_height
-        else:
-            # A delayed callback must not cause a large jump in the height target.
-            self.height += (int(up) - int(down)) * s.height_rate * min(dt, 2 / s.publish_rate)
-            self.height = max(s.minimum_height, min(s.maximum_height, self.height))
+        up, down = self._buttons
+        # A delayed callback must not cause a large jump in the height target.
+        self.height += (int(up) - int(down)) * s.height_rate * min(dt, 2 / s.publish_rate)
+        self.height = max(s.minimum_height, min(s.maximum_height, self.height))
         forward, lateral, yaw = self._axes
         return Command(
             forward * s.sign_forward * s.scale_forward,

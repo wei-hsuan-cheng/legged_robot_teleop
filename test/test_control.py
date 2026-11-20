@@ -98,7 +98,7 @@ def test_invalid_input_disarms(axes, buttons):
     assert not control.enabled
 
 
-def test_height_limits_and_reset():
+def test_height_limits_and_center():
     control = TeleopControl(Settings(
         reference_height=0.22, minimum_height=0.2, maximum_height=0.33, height_rate=0.5,
     ))
@@ -113,8 +113,11 @@ def test_height_limits_and_reset():
         control.receive(*sample(12, pressure=1.0), now)
         control.command(now)
     assert control.height == 0.2
-    control.receive(*sample(3, pressure=1.0), 2.0)
-    assert control.command(2.0).height == 0.22
+    control.receive(*sample(9), 2.0)
+    command = control.command(2.0)
+    assert command.height == 0.22
+    assert (command.forward, command.lateral, command.yaw) == (0, 0, 0)
+    assert not control.enabled
 
 
 def test_both_height_buttons_cancel_and_disabled_height_is_ignored():
@@ -135,7 +138,7 @@ def test_height_does_not_jump_after_a_delayed_callback():
 
 def test_upkie_ignores_lateral_axis_and_optional_buttons_can_be_disabled():
     control = TeleopControl(Settings(
-        scale_lateral=0.0, axis_lateral=-1, button_height_reset=-1,
+        scale_lateral=0.0, axis_lateral=-1, button_center=-1,
     ))
     arm(control)
     control.receive(*sample(axes=(1, 0.5, 0, 0, 0, 0), pressure=1.0), 0.02)
@@ -201,3 +204,57 @@ def test_missing_enable_axis_disarms():
     arm(control)
     control.receive([0.0] * 4, [0] * 15, 0.02)
     assert control.state == 'invalid_input'
+
+
+def test_center_is_ignored_while_enabled_and_not_queued_until_release():
+    control = TeleopControl(Settings())
+    arm(control)
+    control.receive(*sample(11, pressure=1.0), 0.02)
+    height = control.command(0.04).height
+    assert height > control.settings.reference_height
+    control.receive(*sample(9, axes=(0, 1, 0, 0, 0, 0), pressure=1.0), 0.05)
+    command = control.command(0.06)
+    assert command.forward == 0.25
+    assert command.height == height
+    control.receive(*sample(9), 0.07)
+    command = control.command(0.08)
+    assert command.forward == 0
+    assert command.height == height
+    control.receive(*sample(), 0.09)
+    control.receive(*sample(9), 0.1)
+    assert control.command(0.11).height == control.settings.reference_height
+
+
+def test_center_held_cannot_enable_motion():
+    control = TeleopControl(Settings())
+    control.receive(*sample(9), 0.0)
+    control.receive(*sample(9, pressure=1.0), 0.01)
+    assert not control.enabled
+    control.receive(*sample(pressure=1.0), 0.02)
+    assert not control.enabled
+    arm(control, 0.03)
+
+
+def test_center_is_ignored_with_a_partially_pressed_trigger():
+    control = TeleopControl(Settings())
+    arm(control)
+    control.receive(*sample(11, pressure=1.0), 0.02)
+    height = control.command(0.04).height
+    control.receive(*sample(), 0.05)
+    control.receive(*sample(9, pressure=0.3), 0.06)
+    assert control.command(0.07).height == height
+    control.receive(*sample(9), 0.08)
+    assert control.command(0.09).height == height
+
+
+def test_stop_has_priority_over_center():
+    control = TeleopControl(Settings())
+    arm(control)
+    control.receive(*sample(11, pressure=1.0), 0.02)
+    height = control.command(0.04).height
+    control.receive(*sample(1, 9), 0.05)
+    assert control.state == 'stop_button'
+    control.receive(*sample(9), 0.06)
+    command = control.command(0.07)
+    assert command.height == height
+    assert command.forward == 0

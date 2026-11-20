@@ -24,5 +24,5 @@ base_twist_teleop:
     button_stop: 1 # Circle; release L2 and enable again to resume.
     button_height_up: 11 # D-pad up, while L2 is held.
     button_height_down: 12 # D-pad down, while L2 is held.
-    button_height_reset: 3 # Triangle restores nominal height while L2 is held.
+    button_center: 9 # L1: zero motion and nominal height, only with L2 released.
     height_rate: 0.2 # m/s; heights and bounds come from the robot controller YAML.

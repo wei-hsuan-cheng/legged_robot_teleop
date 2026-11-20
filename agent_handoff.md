@@ -54,6 +54,19 @@ No live-device launch, robot simulation, or production command publishing is per
 L2-specific regression coverage includes gradual presses, hysteresis, timeout/stop re-arming, missing trigger axes, and L1 not enabling motion.
 After the L2 change, the package rebuilt and all 48 checks passed without warnings (38 control, seven profile, one DDS transport, two lint).
 The user requested pushing this change and the pending MPC launch/VCS/docs integration to their respective branches.
+
+
+## Center Command
+
+L1 now means Center, replacing the enabled-mode Triangle height reset; its mapping parameter is `button_center`, default 9.
+Only a fresh L1 press with L2 at or below the release threshold can reset height to nominal and keep all velocity/yaw fields zero.
+L1 during driving or a partial trigger press is ignored and never queued until L2 release.
+Holding L1 blocks arming; Circle has priority over Center.
+The same existing publisher sends the complete command, with no second publisher or mixed active/center modes.
+MPC command conditioning remains responsible for the physical reference transition; Center is not a hardware stop.
+The user's YAML changes (100 Hz publishing, full speed scales, 0.2 m/s height rate), now committed separately as `2785fbf`, are preserved.
+Teleop rebuilt successfully with L1 Center, and all 52 checks passed, including the extended DDS transition check.
+No robot simulation or production command publishing was started; restart the existing teleop launch to load the new mapping.
 Robot driving, cable-unplug response with a live gamepad, and Bluetooth need user acceptance after the topic checks.
 Do not start a robot or publish to `/humanoid/walking_velocity_command` during isolated checks.
 

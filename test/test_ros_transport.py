@@ -73,8 +73,21 @@ def test_transport_and_timeout_with_no_simulation_clock():
         assert teleop.control.enabled
         pump(0.1, [0.0, 1.0, 0.0, 0.0, 0.0, 0.0], pressure=1.0)
         assert received[-1].linear_velocity_x > 0
+        pump(0.1, [0.0] * 6, pressed=(11,), pressure=1.0)
+        assert received[-1].desired_pelvis_height > 0.6
+        pump(0.1, [0.0] * 6, pressure=1.0)
+        height = received[-1].desired_pelvis_height
+        pump(0.1, [0.0] * 6, pressed=(9,), pressure=1.0)
+        assert received[-1].desired_pelvis_height == height
+        pump(0.1, [0.0] * 6, pressed=(9,))
+        assert received[-1].desired_pelvis_height == height
         pump(0.1, [0.0] * 6)
         assert received[-1].linear_velocity_x == 0
+        pump(0.1, [0.0] * 6, pressed=(9,))
+        assert received[-1].desired_pelvis_height == 0.6
+        assert received[-1].linear_velocity_x == 0
+        assert received[-1].linear_velocity_y == 0
+        assert received[-1].angular_velocity_z == 0
         assert teleop.get_clock().now().nanoseconds == 0
     finally:
         probe.destroy_subscription(subscription)

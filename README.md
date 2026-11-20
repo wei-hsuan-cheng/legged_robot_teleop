@@ -36,16 +36,20 @@ See [connection and testing](docs/testing.md) for USB, Docker, isolated topic ch
 | Left stick | Forward/backward and left/right |
 | Right stick horizontal | Yaw rate |
 | D-pad up/down, with L2 | Increase/decrease base height |
-| Triangle, with L2 | Restore nominal base height |
+| L1, with L2 released | Center: zero velocity/yaw and restore nominal base height |
 | Circle | Stop velocity commands; release L2 before enabling again |
 | Release L2 or lose input | Zero velocity/yaw, keep the selected height |
 
-The default speed scales are 25% of the MPC's configured maximum speeds.
+The launch YAML currently uses 100% of the MPC's configured maximum speeds; start with small stick deflections.
+Lower the fractions in `config/dualsense.yaml` for slower joystick control without changing MPC tuning.
 Upkie's robot profile disables independent sideways commands.
 Input loss longer than 0.25 wall seconds disarms motion; reconnection with L2 held cannot restart it.
 L2 is axis 4, reported by `game_controller_node` as 0 released to -1 fully pressed.
 The deadman engages at 50% of that ROS range and releases at 20%, avoiding threshold chatter.
-Centered sticks and released height buttons are required at the instant of enabling.
+Centered sticks and released Center/height buttons are required at the instant of enabling.
+Center requires L2 at or below its release threshold and a fresh L1 press.
+L1 presses during driving or partial trigger presses are ignored, not queued for later.
+Release L1 before re-enabling L2.
 This is not a hardware emergency stop and does not deactivate the MPC.
 
 
