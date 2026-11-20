@@ -1,0 +1,25 @@
+base_twist_teleop:
+  ros__parameters:
+    publish_rate: 50.0
+    input_timeout: 0.25 # Wall seconds, independent of simulation time.
+    neutral_threshold: 0.1
+
+    # game_controller_node already uses ROS signs: forward and left are positive.
+    axis_forward: 1
+    axis_lateral: 0
+    axis_yaw: 2
+    sign_forward: 1.0
+    sign_lateral: 1.0
+    sign_yaw: 1.0
+
+    # Fractions of the MPC's configured maximum speeds, not m/s or rad/s.
+    scale_forward: 0.25
+    scale_lateral: 0.25
+    scale_yaw: 0.25
+
+    button_enable: 9 # Hold L1; release and center sticks before enabling.
+    button_stop: 1 # Circle; release L1 and enable again to resume.
+    button_height_up: 11 # D-pad up, while L1 is held.
+    button_height_down: 12 # D-pad down, while L1 is held.
+    button_height_reset: 3 # Triangle restores nominal height while L1 is held.
+    height_rate: 0.05 # m/s; heights and bounds come from the robot controller YAML.
