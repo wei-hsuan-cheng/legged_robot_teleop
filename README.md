@@ -37,17 +37,18 @@ See [connection and testing](docs/testing.md) for USB, Docker, isolated topic ch
 | Right stick horizontal | Yaw rate |
 | D-pad up/down, with L2 | Increase/decrease base height |
 | L1, with L2 released | Center: zero velocity/yaw and restore nominal base height |
-| R1, with L2 released | Upkie: toggle Stand Up / Sit Down, with centered sticks |
+| Square, with L2 released | Upkie: toggle Stand Up / Sit Down, with centered sticks |
 | Circle | Stop velocity commands; release L2 before enabling again |
 | Release L2 or lose input | Zero velocity/yaw, keep the selected height |
 
 The launch YAML currently uses 100% of the MPC's configured maximum speeds; start with small stick deflections.
 Lower the fractions in `config/dualsense.yaml` for slower joystick control without changing MPC tuning.
 Upkie's robot profile disables independent sideways commands.
-For Upkie, R1 requests stand-up from idle or sit-down from locomotion; intermediate and fallen/fault states refuse it.
-R1 also requires L1, D-pad and Circle released.
-Held R1 never repeats or queues a blocked request; release and press again.
-R1 held at connection is ignored until released and pressed again.
+For Upkie, Square requests stand-up from idle or sit-down from locomotion; intermediate and fallen/fault states refuse it.
+Square also requires L1, D-pad and Circle released.
+Held Square never repeats or queues a blocked request; release and press again.
+Square held at connection is ignored until released and pressed again.
+The default is `button_posture: 2` (SDL X / DualSense Square); R1 no longer requests stand-up or sit-down.
 The controller owns the posture transition; teleop only calls its `~/toggle_stand` service.
 While the robot is not in locomotion, or its 10 Hz state heartbeat is lost for 0.5 s, the adapter disarms driving.
 After stand-up, release and press L2 again to enable motion.
@@ -129,6 +130,6 @@ colcon test-result --verbose
 
 Unit tests cover signs/scaling, height bounds, release/stop, malformed input, timeouts, and reconnection.
 FSM regressions cover post-Center re-enabling, trigger hysteresis, blocked-input recovery, clock faults, and 6,000 deterministic randomized input steps.
-Isolated service tests cover R1 edges, blocked presses, transition states, stale robot status and L2 re-arming at handover.
+Isolated service tests cover Square edges, configurable mapping, blocked presses, transition states, stale robot status and L2 re-arming at handover.
 The ROS transport test uses its own ROS domain and unique test topics, including a paused simulation clock with no `/clock` publisher.
 It never sends robot commands or starts a simulation.

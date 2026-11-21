@@ -27,7 +27,7 @@ class BaseTwistTeleop(Node):
         self.declare_parameter('joy_source_topic', '', descriptor)
         self.declare_parameter('command_topic', '/humanoid/walking_velocity_command', descriptor)
         posture_controller = self.declare_parameter('posture_controller', '', descriptor).value
-        self._posture_button = self.declare_parameter('button_posture', 10, descriptor).value
+        self._posture_button = self.declare_parameter('button_posture', 2, descriptor).value
         if self._posture_button < 0:
             raise ValueError('button_posture must be nonnegative')
         self._posture_button_held = None
@@ -128,7 +128,9 @@ class BaseTwistTeleop(Node):
         if self._posture_future is not None and not self._posture_future.done():
             return
         if not self._posture_client.service_is_ready():
-            self.get_logger().warning('Stand/sit service is unavailable; release R1 and retry.')
+            self.get_logger().warning(
+                'Stand/sit service is unavailable; release the posture button and retry.',
+            )
             return
         self.control.stop('posture_requested')
         self._posture_request_time = time.monotonic()

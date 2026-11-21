@@ -117,3 +117,19 @@ Held R1 after a joystick input gap is also consumed until release; this is check
 Robot state and Joy arrive independently, so the controller remains the final authority for accepting a posture request even when client state is a heartbeat behind.
 The final 80-check run passed without errors or skipped tests, and both packages' final install refresh passed.
 The user then requested committing and pushing this package on `main` together with the MPC integration on `feat/wheeled_biped`.
+
+
+## Square Posture Toggle (2026-11-21)
+
+The user replaced the R1 stand/sit toggle with DualSense Square.
+The node default and shipped YAML now use `button_posture: 2` (the standard game_controller_node SDL X / Square index).
+R1 no longer triggers a posture request by default; a deliberate `button_posture` override remains supported.
+L2, L1 Center, Circle, motion axes, height controls and all posture/trigger interlocks are unchanged.
+The isolated service regression runs against both the default Square mapping and an explicit R1 override, checks that the other button does nothing, and retains blocked/held/reconnect/transition coverage.
+A separate check confirms the shipped YAML specifies Square.
+Both packages built, and all 82 teleop checks passed without skips.
+The companion MPC guides and synthetic-Joy cycle harness use Square; previous R1 simulation results remain historical evidence rather than being relabeled.
+Two estimated-state Square-driven stand/drive/sit cycles passed at a 200 Hz MPC target, with maximum locomotion-labelled tilt 0.07047 rad.
+The simulation was stopped after acceptance; artifacts are `/tmp/codex_upkie_square.*` in `ros_jazzy`.
+This validates synthetic Joy through the real teleop service path, not physical gamepad or hardware behavior.
+The user requested committing and pushing both repositories after testing.

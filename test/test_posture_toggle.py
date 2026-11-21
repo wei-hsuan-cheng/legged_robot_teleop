@@ -1,4 +1,4 @@
-"""Exercise R1 edges and trigger interlocks through real ROS services, without a robot."""
+"""Exercise posture-button edges and interlocks through ROS services, without a robot."""
 
 import time
 from uuid import uuid4
@@ -6,7 +6,8 @@ from uuid import uuid4
 import pytest
 
 
-def test_r1_toggle_requires_release_and_safe_fresh_robot_state():
+@pytest.mark.parametrize('posture_button', [2, 10])
+def test_posture_toggle_requires_release_and_safe_fresh_robot_state(posture_button):
     """A held or blocked button never becomes a delayed stand/sit request."""
     pytest.importorskip('rclpy')
     from legged_robot_teleop.node import BaseTwistTeleop
@@ -22,11 +23,15 @@ def test_r1_toggle_requires_release_and_safe_fresh_robot_state():
     context = Context()
     context.init(domain_id=156)
     namespace = '/teleop_posture_test_' + uuid4().hex
-    teleop = BaseTwistTeleop(context=context, parameter_overrides=[
+    overrides = [
         Parameter('joy_topic', value=namespace + '/joy'),
         Parameter('command_topic', value=namespace + '/command'),
         Parameter('posture_controller', value=namespace),
-    ])
+    ]
+    if posture_button != 2:
+        overrides.append(Parameter('button_posture', value=posture_button))
+    teleop = BaseTwistTeleop(context=context, parameter_overrides=overrides)
+    assert teleop._posture_button == posture_button
     probe = Node('posture_probe', context=context)
     calls = []
 
@@ -58,27 +63,30 @@ def test_r1_toggle_requires_release_and_safe_fresh_robot_state():
             executor.spin_once(timeout_sec=0.005)
 
     try:
-        pump((10,), duration=0.5)
-        assert not calls, 'A held R1 at connection is not a new request'
+        pump((posture_button,), duration=0.5)
+        assert not calls, 'A held posture button at connection is not a new request'
         pump()
-        pump((10,))
+        pump((10 if posture_button == 2 else 2,))
+        assert not calls, 'The previous/other mapping must not request a posture'
+        pump()
+        pump((posture_button,))
         assert len(calls) == 1
-        pump((10,), duration=0.3)
+        pump((posture_button,), duration=0.3)
         assert len(calls) == 1, 'Autorepeat must not toggle again'
         pump()
         end = time.monotonic() + .35
         while time.monotonic() < end:
             executor.spin_once(timeout_sec=0.01)
-        pump((10,))
-        assert len(calls) == 1, 'Held R1 after an input gap must not request a posture'
+        pump((posture_button,))
+        assert len(calls) == 1, 'Held button after an input gap must not request a posture'
         pump()
-        pump((10,), pressure=1.0)
-        pump((10,), pressure=0.0)
-        assert len(calls) == 1, 'A blocked R1 is consumed, not queued'
+        pump((posture_button,), pressure=1.0)
+        pump((posture_button,), pressure=0.0)
+        assert len(calls) == 1, 'A blocked posture button is consumed, not queued'
         for buttons, forward, state in (
-                ((10, 9), 0.0, 'idle'), ((10, 1), 0.0, 'idle'),
-                ((10, 11), 0.0, 'idle'), ((10,), 1.0, 'idle'),
-                ((10,), 0.0, 'standing up'), ((10,), 0.0, 'fallen')):
+                ((posture_button, 9), 0.0, 'idle'), ((posture_button, 1), 0.0, 'idle'),
+                ((posture_button, 11), 0.0, 'idle'), ((posture_button,), 1.0, 'idle'),
+                ((posture_button,), 0.0, 'standing up'), ((posture_button,), 0.0, 'fallen')):
             # Robot state and Joy are independent DDS topics; deliver the new state
             # before checking the adapter's guard. The real server also validates its phase.
             pump(state=state)
@@ -86,7 +94,7 @@ def test_r1_toggle_requires_release_and_safe_fresh_robot_state():
             pump(buttons, state=state, forward=forward)
             assert len(calls) == 1
         pump(state='locomotion')
-        pump((10,), state='locomotion')
+        pump((posture_button,), state='locomotion')
         assert len(calls) == 2
         pump(state='sitting down')
         pump(pressure=1.0, state='sitting down')
@@ -107,3 +115,14 @@ def test_r1_toggle_requires_release_and_safe_fresh_robot_state():
         teleop.destroy_node()
         probe.destroy_node()
         context.shutdown()
+
+
+def test_shipped_posture_mapping_is_square():
+    """Keep the launch YAML and the intended DualSense button consistent."""
+    from pathlib import Path
+    import yaml
+
+    config = yaml.safe_load(
+        (Path(__file__).parents[1] / 'config/dualsense.yaml').read_text(),
+    )
+    assert config['base_twist_teleop']['ros__parameters']['button_posture'] == 2

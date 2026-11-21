@@ -25,5 +25,5 @@ base_twist_teleop:
     button_height_up: 11 # D-pad up, while L2 is held.
     button_height_down: 12 # D-pad down, while L2 is held.
     button_center: 9 # L1: zero motion and nominal height, only with L2 released.
-    button_posture: 10 # R1: stand/sit toggle for planned stand-up robots, only with L2 released.
+    button_posture: 2 # Square (SDL X): stand/sit toggle, only with L2 released.
     height_rate: 0.2 # m/s; heights and bounds come from the robot controller YAML.
