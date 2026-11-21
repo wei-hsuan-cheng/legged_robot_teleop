@@ -37,12 +37,21 @@ See [connection and testing](docs/testing.md) for USB, Docker, isolated topic ch
 | Right stick horizontal | Yaw rate |
 | D-pad up/down, with L2 | Increase/decrease base height |
 | L1, with L2 released | Center: zero velocity/yaw and restore nominal base height |
+| R1, with L2 released | Upkie: toggle Stand Up / Sit Down, with centered sticks |
 | Circle | Stop velocity commands; release L2 before enabling again |
 | Release L2 or lose input | Zero velocity/yaw, keep the selected height |
 
 The launch YAML currently uses 100% of the MPC's configured maximum speeds; start with small stick deflections.
 Lower the fractions in `config/dualsense.yaml` for slower joystick control without changing MPC tuning.
 Upkie's robot profile disables independent sideways commands.
+For Upkie, R1 requests stand-up from idle or sit-down from locomotion; intermediate and fallen/fault states refuse it.
+R1 also requires L1, D-pad and Circle released.
+Held R1 never repeats or queues a blocked request; release and press again.
+R1 held at connection is ignored until released and pressed again.
+The controller owns the posture transition; teleop only calls its `~/toggle_stand` service.
+While the robot is not in locomotion, or its 10 Hz state heartbeat is lost for 0.5 s, the adapter disarms driving.
+After stand-up, release and press L2 again to enable motion.
+Posture control is enabled automatically only when the selected controller YAML defines a planned stand-up; G1/H2 have no new posture-button behavior.
 Input loss longer than 0.25 wall seconds disarms motion; reconnection with L2 held cannot restart it.
 L2 is axis 4, reported by `game_controller_node` as 0 released to -1 fully pressed.
 The deadman engages at 50% of that ROS range and releases at 20%, avoiding threshold chatter.
@@ -120,5 +129,6 @@ colcon test-result --verbose
 
 Unit tests cover signs/scaling, height bounds, release/stop, malformed input, timeouts, and reconnection.
 FSM regressions cover post-Center re-enabling, trigger hysteresis, blocked-input recovery, clock faults, and 6,000 deterministic randomized input steps.
+Isolated service tests cover R1 edges, blocked presses, transition states, stale robot status and L2 re-arming at handover.
 The ROS transport test uses its own ROS domain and unique test topics, including a paused simulation clock with no `/clock` publisher.
 It never sends robot commands or starts a simulation.

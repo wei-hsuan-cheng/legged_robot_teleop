@@ -98,3 +98,22 @@ The package rebuilt successfully and all 78 checks passed before the user reques
 The two post-Center regressions failed on the prior implementation and passed on the explicit FSM.
 No robot was started, no production commands were published, and the MPC repository remained unchanged.
 Further testing stopped at the user's request; restart teleop to load the changes.
+
+
+## Upkie Operator Posture Requests (2026-11-21)
+
+The user requested real Stand Up / Sit Down controls in both GUI and joystick, with DualSense R1 as the toggle.
+The adapter reads `bringUp.standUpTrajectoryFile` from the same controller YAML as its height profile and sets `posture_controller` only when that trajectory exists.
+R1 (SDL button 10, configurable as `button_posture`) calls that controller's `~/toggle_stand` Trigger service on a fresh edge.
+It requires released L2, neutral sticks and released L1/D-pad/Circle; held-at-connect, blocked, repeated and intermediate-state presses are never queued.
+Only the controller chooses whether a valid toggle stands or sits.
+Best-effort `~/motion_state` feedback must be fresh within 0.5 wall seconds; driving is disarmed outside locomotion and on stale state.
+The operator must release and press L2 again after stand-up.
+The existing trigger FSM, Center semantics, numerical speed/height settings and joystick QoS remain unchanged.
+All 80 checks passed, including real isolated DDS posture requests and the older 6,000-step trigger regressions.
+The MPC integration has also completed estimated-state repeated stand/sit cycles and a deliberate latched-fall trial; its final test results and artifacts are recorded in that repository's wheeled-biped handoff.
+No physical controller or hardware acceptance is claimed.
+Held R1 after a joystick input gap is also consumed until release; this is checked with real DDS input.
+Robot state and Joy arrive independently, so the controller remains the final authority for accepting a posture request even when client state is a heartbeat behind.
+The final 80-check run passed without errors or skipped tests, and both packages' final install refresh passed.
+The user then requested committing and pushing this package on `main` together with the MPC integration on `feat/wheeled_biped`.

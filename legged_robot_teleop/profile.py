@@ -23,4 +23,6 @@ def load_robot_profile(path, controller_name, height_override=''):
         'reference_height': height,
         'minimum_height': minimum,
         'maximum_height': maximum,
+        'posture_controller': ('/' + controller_name if config[controller_name]['ros__parameters']
+                               .get('bringUp', {}).get('standUpTrajectoryFile') else ''),
     }, lateral > 0

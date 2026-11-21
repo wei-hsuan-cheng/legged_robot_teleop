@@ -21,6 +21,7 @@ def test_profile_disables_sideways_drive(controllers):
     profile, lateral = load_robot_profile(controllers, 'controller')
     assert profile == {
         'reference_height': 0.22, 'minimum_height': 0.2, 'maximum_height': 0.33,
+        'posture_controller': '',
     }
     assert not lateral
 
@@ -28,6 +29,14 @@ def test_profile_disables_sideways_drive(controllers):
 def test_reference_height_override(controllers):
     profile, _ = load_robot_profile(controllers, 'controller', '0.3')
     assert profile['reference_height'] == 0.3
+
+
+def test_planned_stand_up_enables_posture_control(controllers):
+    config = yaml.safe_load(controllers.read_text())
+    config['controller']['ros__parameters']['bringUp'] = {'standUpTrajectoryFile': 'plan.yaml'}
+    controllers.write_text(yaml.safe_dump(config))
+    profile, _ = load_robot_profile(controllers, 'controller')
+    assert profile['posture_controller'] == '/controller'
 
 
 @pytest.mark.parametrize('height', ['0.19', '0.34', 'nan', 'inf'])
