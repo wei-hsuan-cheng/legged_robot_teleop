@@ -77,7 +77,7 @@ def test_fault_and_center_release_recovery(failure):
     send(control, 0.0)
     send(control, 0.01, 0.6)
     if failure == 'stop':
-        send(control, 0.02, 0.6, buttons=(1,))
+        control.stop('robot_inactive')
     elif failure == 'timeout':
         control.command(0.3)
     else:
@@ -130,10 +130,10 @@ def test_randomized_input_sequences_never_bypass_enable_guards(seed):
         assert abs(command.forward) <= control.settings.scale_forward
         if not control.enabled:
             assert command.forward == command.lateral == command.yaw == 0
-        if pressure <= control.settings.release_threshold or 1 in buttons:
+        if pressure <= control.settings.release_threshold:
             assert not control.enabled
         if control.enabled and previous_mode is not EnableState.ENABLED:
             assert previous_mode is EnableState.READY
             assert pressure >= control.settings.enable_threshold
             assert abs(forward) <= control.settings.neutral_threshold
-            assert not buttons
+            assert not any(i in buttons for i in (9, 11, 12))

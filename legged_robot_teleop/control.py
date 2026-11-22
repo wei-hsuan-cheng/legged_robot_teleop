@@ -23,7 +23,6 @@ class Settings:
     scale_yaw: float = 0.25
     enable_threshold: float = 0.5
     release_threshold: float = 0.2
-    button_stop: int = 1
     button_height_up: int = 11
     button_height_down: int = 12
     button_center: int = 9
@@ -42,8 +41,8 @@ class Settings:
                     raise ValueError(f'{name} must be an integer >= -1')
             elif not math.isfinite(value):
                 raise ValueError(f'{name} must be finite')
-        if self.axis_enable < 0 or self.button_stop < 0:
-            raise ValueError('Enable axis and stop button cannot be disabled')
+        if self.axis_enable < 0:
+            raise ValueError('Enable axis cannot be disabled')
         if self.axis_enable in (self.axis_forward, self.axis_lateral, self.axis_yaw):
             raise ValueError('Enable axis must be separate from motion axes')
         if not 0 <= self.release_threshold < self.enable_threshold <= 1:
@@ -135,8 +134,7 @@ class TeleopControl:
             self.stop('input_timeout')
         axis_indices = (s.axis_forward, s.axis_lateral, s.axis_yaw)
         button_indices = (
-            s.button_stop, s.button_height_up,
-            s.button_height_down, s.button_center,
+            s.button_height_up, s.button_height_down, s.button_center,
         )
         valid = (
             all(i < len(axes) for i in (*axis_indices, s.axis_enable))
@@ -162,10 +160,7 @@ class TeleopControl:
         self._last_input = now
         pressure = max(0.0, min(1.0, s.sign_enable * axes[s.axis_enable]))
         self.last_trigger_pressure = pressure
-        if pressed(s.button_stop):
-            self.stop('stop_button')
-            return
-        height_buttons = tuple(pressed(i) for i in button_indices[1:3])
+        height_buttons = tuple(pressed(i) for i in button_indices[:2])
         if center_pressed:
             blocker = 'center_held'
         elif any(height_buttons):

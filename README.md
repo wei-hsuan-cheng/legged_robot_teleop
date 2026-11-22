@@ -38,14 +38,14 @@ See [connection and testing](docs/testing.md) for USB, Docker, isolated topic ch
 | D-pad up/down, with L2 | Increase/decrease base height |
 | L1, with L2 released | Center: zero velocity/yaw and restore nominal base height |
 | Square, with L2 released | Upkie: toggle Stand Up / Sit Down, with centered sticks |
-| Circle | Stop velocity commands; release L2 before enabling again |
+| Circle | Unassigned; reserved for future use |
 | Release L2 or lose input | Zero velocity/yaw, keep the selected height |
 
 The launch YAML currently uses 100% of the MPC's configured maximum speeds; start with small stick deflections.
 Lower the fractions in `config/dualsense.yaml` for slower joystick control without changing MPC tuning.
 Upkie's robot profile disables independent sideways commands.
 For Upkie, Square requests stand-up from idle or sit-down from locomotion; intermediate and fallen/fault states refuse it.
-Square also requires L1, D-pad and Circle released.
+Square also requires L1 and D-pad released.
 Held Square never repeats or queues a blocked request; release and press again.
 Square held at connection is ignored until released and pressed again.
 The default is `button_posture: 2` (SDL X / DualSense Square); R1 no longer requests stand-up or sit-down.

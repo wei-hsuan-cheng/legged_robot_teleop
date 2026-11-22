@@ -44,21 +44,32 @@ def test_axes_are_normalized_with_ros_signs():
     assert (command.forward, command.lateral, command.yaw) == (0.4, -0.1, -0.3)
 
 
-@pytest.mark.parametrize('stop_button', [False, True])
-def test_release_and_stop_zero_velocities_preserving_height(stop_button):
+def test_release_zeroes_velocities_preserving_height():
     control = TeleopControl(Settings())
     arm(control)
     control.receive(*sample(11, pressure=1.0), 0.02)
     height = control.command(0.04).height
-    control.receive(*sample(1, pressure=1.0) if stop_button else sample(), 0.05)
+    control.receive(*sample(), 0.05)
     command = control.command(0.06)
     assert (command.forward, command.lateral, command.yaw) == (0, 0, 0)
     assert command.height == height
     control.receive(*sample(pressure=1.0), 0.07)
-    if stop_button:
-        assert not control.enabled
-    else:
-        assert control.enabled
+    assert control.enabled
+
+
+def test_circle_is_unbound_during_arming_and_driving():
+    control = TeleopControl(Settings())
+    control.receive(*sample(1, pressure=1.0), 0.0)
+    assert not control.enabled, 'Circle must not bypass startup release'
+    control.receive(*sample(1), 0.01)
+    control.receive(*sample(1, pressure=1.0), 0.02)
+    assert control.enabled, 'Holding Circle must not block a safe L2 press'
+    control.receive(*sample(1, axes=(0, 1, 0, 0, 0, 0), pressure=1.0), 0.03)
+    assert control.command(0.04).forward == control.settings.scale_forward
+    control.receive(*sample(pressure=1.0), 0.05)
+    assert control.enabled, 'Releasing Circle must not disarm driving'
+    control.receive(*sample(1), 0.06)
+    assert not control.enabled, 'L2 release must still stop motion'
 
 
 def test_timeout_and_reconnection_require_fresh_release():
@@ -151,7 +162,7 @@ def test_upkie_ignores_lateral_axis_and_optional_buttons_can_be_disabled():
     {'minimum_height': 0.0}, {'reference_height': 2.0},
     {'height_rate': -0.1}, {'input_timeout': 0.0},
     {'scale_forward': 1.1}, {'scale_yaw': math.nan},
-    {'axis_enable': -1}, {'button_stop': 11},
+    {'axis_enable': -1}, {'button_center': 11},
     {'axis_forward': -2}, {'axis_yaw': 1.0},
     {'sign_forward': 0.0}, {'publish_rate': 0.0},
     {'neutral_threshold': 1.0},
@@ -193,7 +204,7 @@ def test_partly_held_trigger_cannot_rearm_after_timeout_or_stop():
     control.receive(*sample(pressure=1.0), 1.02)
     assert not control.enabled
     arm(control, 1.03)
-    control.receive(*sample(1, pressure=1.0), 1.05)
+    control.stop('robot_inactive')
     control.receive(*sample(pressure=0.3), 1.06)
     control.receive(*sample(pressure=1.0), 1.07)
     assert not control.enabled
@@ -247,16 +258,16 @@ def test_center_is_ignored_with_a_partially_pressed_trigger():
     assert control.command(0.09).height == height
 
 
-def test_stop_has_priority_over_center():
+def test_circle_does_not_block_center():
     control = TeleopControl(Settings())
     arm(control)
     control.receive(*sample(11, pressure=1.0), 0.02)
-    height = control.command(0.04).height
+    assert control.command(0.04).height > control.settings.reference_height
     control.receive(*sample(1, 9), 0.05)
-    assert control.state == 'stop_button'
+    assert control.state == 'centered'
     control.receive(*sample(9), 0.06)
     command = control.command(0.07)
-    assert command.height == height
+    assert command.height == control.settings.reference_height
     assert command.forward == 0
 
 

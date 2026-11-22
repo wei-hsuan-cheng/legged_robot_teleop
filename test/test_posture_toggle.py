@@ -69,9 +69,11 @@ def test_posture_toggle_requires_release_and_safe_fresh_robot_state(posture_butt
         pump((10 if posture_button == 2 else 2,))
         assert not calls, 'The previous/other mapping must not request a posture'
         pump()
-        pump((posture_button,))
+        pump((1,))
+        assert not calls, 'Circle must not request a posture'
+        pump((posture_button, 1))
         assert len(calls) == 1
-        pump((posture_button,), duration=0.3)
+        pump((posture_button, 1), duration=0.3)
         assert len(calls) == 1, 'Autorepeat must not toggle again'
         pump()
         end = time.monotonic() + .35
@@ -84,7 +86,7 @@ def test_posture_toggle_requires_release_and_safe_fresh_robot_state(posture_butt
         pump((posture_button,), pressure=0.0)
         assert len(calls) == 1, 'A blocked posture button is consumed, not queued'
         for buttons, forward, state in (
-                ((posture_button, 9), 0.0, 'idle'), ((posture_button, 1), 0.0, 'idle'),
+                ((posture_button, 9), 0.0, 'idle'),
                 ((posture_button, 11), 0.0, 'idle'), ((posture_button,), 1.0, 'idle'),
                 ((posture_button,), 0.0, 'standing up'), ((posture_button,), 0.0, 'fallen')):
             # Robot state and Joy are independent DDS topics; deliver the new state
@@ -94,7 +96,7 @@ def test_posture_toggle_requires_release_and_safe_fresh_robot_state(posture_butt
             pump(buttons, state=state, forward=forward)
             assert len(calls) == 1
         pump(state='locomotion')
-        pump((posture_button,), state='locomotion')
+        pump((posture_button, 1), state='locomotion')
         assert len(calls) == 2
         pump(state='sitting down')
         pump(pressure=1.0, state='sitting down')
@@ -126,3 +128,4 @@ def test_shipped_posture_mapping_is_square():
         (Path(__file__).parents[1] / 'config/dualsense.yaml').read_text(),
     )
     assert config['base_twist_teleop']['ros__parameters']['button_posture'] == 2
+    assert 'button_stop' not in config['base_twist_teleop']['ros__parameters']

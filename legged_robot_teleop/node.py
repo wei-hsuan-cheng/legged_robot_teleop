@@ -79,7 +79,7 @@ class BaseTwistTeleop(Node):
         self.get_logger().info(
             f'Output: {self._publisher.topic_name}. Disable other command publishers. '
             'Release the enable trigger, center sticks, then hold it to drive '
-            '(DualSense default: L2). Circle stops motion.',
+            '(DualSense default: L2). Release L2 to stop motion.',
         )
 
     def _receive(self, message):
@@ -114,7 +114,7 @@ class BaseTwistTeleop(Node):
         if not edge or self.control.last_trigger_pressure > s.release_threshold:
             return
         blocking_buttons = (
-            s.button_stop, s.button_center, s.button_height_up, s.button_height_down,
+            s.button_center, s.button_height_up, s.button_height_down,
         )
         if any(message.buttons[i] for i in blocking_buttons if i >= 0):
             return

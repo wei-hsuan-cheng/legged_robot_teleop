@@ -90,7 +90,8 @@ With L2 released, press L1 to Center: zero velocity/yaw and restore nominal heig
 Press L1 while driving and check that it does not reset height or interrupt motion.
 Keep L1 held while releasing L2 and check that no deferred Center occurs; release L1 and press it again to Center.
 Release L1 before re-enabling L2.
-Press Circle while holding L2 and check that motion cannot resume until L2 is released and pressed again with centered sticks.
+Circle is unassigned: pressing or releasing it must not stop driving, affect Center or block Square.
+Release L2 to stop motion while keeping the selected height.
 Unplug the cable while commanding motion: output should become zero within approximately 0.25 seconds plus one publish interval, subject to host scheduling.
 Reconnect with L2 held and check that it stays disabled until released and enabled again.
 This timeout covers loss of Joy input while teleop is alive, not a killed process or DDS/network failure downstream.

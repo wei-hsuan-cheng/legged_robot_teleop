@@ -133,3 +133,17 @@ Two estimated-state Square-driven stand/drive/sit cycles passed at a 200 Hz MPC 
 The simulation was stopped after acceptance; artifacts are `/tmp/codex_upkie_square.*` in `ros_jazzy`.
 This validates synthetic Joy through the real teleop service path, not physical gamepad or hardware behavior.
 The user requested committing and pushing both repositories after testing.
+
+
+## Circle Unassigned (2026-11-22)
+
+The user requested removing Circle's current function and reserving it for future use.
+The stop-button setting, YAML binding, stop handling and posture-button blocker were removed rather than remapped.
+Circle remains present in the unchanged raw/public Joy messages but has no action in the adapter.
+It cannot stop or arm driving, block L1 Center, or request/block Square stand/sit.
+L2 release, input timeout, malformed-input guards, robot-state guards and all other bindings remain in effect.
+Earlier Circle-stop statements above describe historical checkpoints, not the current behavior.
+Regression tests cover ignored Circle while arming/driving, Center with Circle held, and real DDS Square requests with Circle held.
+The shared package built in both the OCS2 and TurboMPC workspaces; each passed all 82 checks without errors, failures or skips.
+No robot launch was started or stopped for these isolated checks.
+The user requested pushing the shared-package change and synchronized operator guides.

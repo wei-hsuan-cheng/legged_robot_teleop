@@ -9,9 +9,9 @@ The command topic, robot limits, speed fractions, height rate, and L2 thresholds
 
 | State | Meaning | Transition |
 | --- | --- | --- |
-| `wait_release` | Startup, fault, stop, or unsafe enable attempt | A fresh valid input with L2 pressure <= 0.2 and Circle released enters `ready` |
+| `wait_release` | Startup, fault, stop, or unsafe enable attempt | A fresh valid input with L2 pressure <= 0.2 enters `ready` |
 | `ready` | L2 release has been observed; output velocity/yaw is zero | Pressure >= 0.5 with centered motion axes, L1 released, and D-pad released enters `enabled` |
-| `enabled` | Hold-to-drive | L2 pressure <= 0.2 returns to `ready`; a fault or Circle returns to `wait_release` |
+| `enabled` | Hold-to-drive | L2 pressure <= 0.2 returns to `ready`; a fault returns to `wait_release` |
 
 The pressure band between 0.2 and 0.5 preserves the previous permission state.
 There is no release debounce delay; a released L2 immediately clears motion commands.
@@ -26,7 +26,7 @@ All non-enabled states clear cached motion and D-pad commands, preserving the se
 L1 Center is accepted only on a fresh button edge with L2 at or below its release threshold.
 It restores nominal height and leaves velocity/yaw zero through the existing command publisher.
 L1 presses while driving or partially pressing L2 are consumed without queueing a later reset.
-Circle has priority over Center.
+Circle is unassigned and does not affect motion permission or Center.
 Holding L1 blocks enabling, but does not erase the fact that L2 was physically released.
 Therefore, a subsequent message may safely release L1 and press L2 together, provided the other controls are neutral.
 This fixes the earlier requirement for an extra input message with both L1 and L2 released.
@@ -55,7 +55,6 @@ The trigger pressure is the last valid input value, not a claim that a disconnec
 | `input_timeout` | Check the input stream; reconnect, release L2, then enable again |
 | `invalid_input` | Check driver mapping and message shape |
 | `invalid_time` | Check the receipt/timer time source, then release L2 and retry |
-| `stop_button` | Release Circle and L2 before trying again |
 
 In `ready`, `center_held`, `height_buttons_held`, and `sticks_not_centered` are preparation hints rather than faults.
 `ready` means neutral controls and L2 below the engage threshold; `centered` records an accepted Center edge.
