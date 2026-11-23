@@ -1,7 +1,7 @@
 base_twist_teleop:
   ros__parameters:
     publish_rate: 100.0
-    input_timeout: 0.5 # Wall seconds, independent of simulation time.
+    input_timeout: 10.0 # Wall seconds, independent of simulation time.
     neutral_threshold: 0.1
 
     # game_controller_node already uses ROS signs: forward and left are positive.
