@@ -3,36 +3,38 @@
 import time
 from uuid import uuid4
 
+from conftest import DOMAIN_ID, Status, wait_for
 import pytest
 
 
 @pytest.mark.parametrize('posture_button', [2, 10])
-def test_posture_toggle_requires_release_and_safe_fresh_robot_state(posture_button):
+def test_posture_toggle_requires_release_and_safe_fresh_robot_state(
+        posture_button, teleop_process):
     """A held or blocked button never becomes a delayed stand/sit request."""
     pytest.importorskip('rclpy')
-    from legged_robot_teleop.node import BaseTwistTeleop
     from rclpy.context import Context
     from rclpy.executors import SingleThreadedExecutor
     from rclpy.node import Node
-    from rclpy.parameter import Parameter
-    from rclpy.qos import QoSProfile, ReliabilityPolicy
+    from rclpy.qos import qos_profile_sensor_data, QoSProfile, ReliabilityPolicy
     from sensor_msgs.msg import Joy
     from std_msgs.msg import String
     from std_srvs.srv import Trigger
 
     context = Context()
-    context.init(domain_id=156)
-    namespace = '/teleop_posture_test_' + uuid4().hex
-    overrides = [
-        Parameter('joy_topic', value=namespace + '/joy'),
-        Parameter('command_topic', value=namespace + '/command'),
-        Parameter('posture_controller', value=namespace),
+    context.init(domain_id=DOMAIN_ID)
+    suffix = uuid4().hex
+    namespace = '/teleop_posture_test_' + suffix
+    node_name = 'teleop_' + suffix
+    args = [
+        '-r', '__node:=' + node_name,
+        '-p', 'joy_topic:=' + namespace + '/joy',
+        '-p', 'command_topic:=' + namespace + '/command',
+        '-p', 'posture_controller:=' + namespace,
     ]
     if posture_button != 2:
-        overrides.append(Parameter('button_posture', value=posture_button))
-    teleop = BaseTwistTeleop(context=context, parameter_overrides=overrides)
-    assert teleop._posture_button == posture_button
-    probe = Node('posture_probe', context=context)
+        args += ['-p', 'button_posture:=%d' % posture_button]
+    teleop_process(*args)
+    probe = Node('posture_probe_' + suffix, context=context)
     calls = []
 
     def toggle(request, response):
@@ -41,12 +43,13 @@ def test_posture_toggle_requires_release_and_safe_fresh_robot_state(posture_butt
         response.message = 'accepted'
         return response
 
-    service = probe.create_service(Trigger, namespace + '/toggle_stand', toggle)
+    probe.create_service(Trigger, namespace + '/toggle_stand', toggle)
     qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT)
     state_publisher = probe.create_publisher(String, namespace + '/motion_state', qos)
     joy_publisher = probe.create_publisher(Joy, namespace + '/joy', qos)
+    status = Status()
+    probe.create_subscription(String, '/' + node_name + '/status', status, qos_profile_sensor_data)
     executor = SingleThreadedExecutor(context=context)
-    executor.add_node(teleop)
     executor.add_node(probe)
 
     def pump(pressed=(), pressure=0.0, state='idle', forward=0.0, duration=0.15):
@@ -63,6 +66,11 @@ def test_posture_toggle_requires_release_and_safe_fresh_robot_state(posture_butt
             executor.spin_once(timeout_sec=0.005)
 
     try:
+        wait_for(executor, lambda: status.history
+                 and joy_publisher.get_subscription_count() >= 1
+                 and state_publisher.get_subscription_count() >= 1
+                 and probe.count_clients(namespace + '/toggle_stand') >= 1,
+                 what='teleop startup')
         pump((posture_button,), duration=0.5)
         assert not calls, 'A held posture button at connection is not a new request'
         pump()
@@ -86,7 +94,6 @@ def test_posture_toggle_requires_release_and_safe_fresh_robot_state(posture_butt
             # Robot state and Joy are independent DDS topics; deliver the new state
             # before checking the adapter's guard. The real server also validates its phase.
             pump(state=state)
-            assert teleop._motion_state == state
             pump(buttons, state=state, forward=forward)
             assert len(calls) == 1
         pump(state='locomotion')
@@ -94,21 +101,19 @@ def test_posture_toggle_requires_release_and_safe_fresh_robot_state(posture_butt
         assert len(calls) == 2
         pump(state='sitting down')
         pump(pressure=1.0, state='sitting down')
-        assert not teleop.control.enabled
+        assert not status.enabled
         pump(pressure=1.0, state='locomotion')
-        assert not teleop.control.enabled, 'Held L2 must not enable at handover'
+        assert not status.enabled, 'Held L2 must not enable at handover'
         pump(state='locomotion')
         pump(pressure=1.0, state='locomotion')
-        assert teleop.control.enabled
+        assert status.enabled
         end = time.monotonic() + 0.6
         while time.monotonic() < end:
             executor.spin_once(timeout_sec=0.01)
-        assert not teleop.control.enabled
-        assert teleop._motion_state == 'unknown'
+        assert not status.enabled
+        assert status.reason == 'robot_state_timeout'
     finally:
-        probe.destroy_service(service)
         executor.shutdown()
-        teleop.destroy_node()
         probe.destroy_node()
         context.shutdown()
 

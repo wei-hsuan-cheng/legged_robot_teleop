@@ -1,6 +1,7 @@
 # Legged Robot Teleop
 
 DualSense gamepad commands for legged robot MPC, using ROS 2 Jazzy's standard `joy` driver.
+The adapter is a C++ node (`base_twist`, also the `legged_robot_teleop::BaseTwistTeleop` component); a small Python module, `legged_robot_teleop.profile`, reads robot height bounds for the launch file.
 Publishes the same `ocs2_msgs/msg/WalkingVelocityCommand` as the base-command GUI.
 No MPC controller, estimator, robot model, or low-level control is implemented here.
 
@@ -130,8 +131,8 @@ colcon test --packages-select legged_robot_teleop --event-handlers console_direc
 colcon test-result --verbose
 ```
 
-Unit tests cover signs/scaling, height bounds, release/stop, malformed input, held commands without new input, and the stick response curve.
-FSM regressions cover post-Center re-enabling, trigger hysteresis, blocked-input recovery, clock faults, and 6,000 deterministic randomized input steps.
+C++ unit tests (gtest, `test/test_control.cpp`) cover signs/scaling, height bounds, release/stop, malformed input, held commands without new input, the stick response curve, and the enable FSM: post-Center re-enabling, trigger hysteresis, blocked-input recovery, clock faults, and 6,000 deterministic randomized input steps.
+The ROS-level pytest tests start the built `base_twist` executable and observe it only through topics, `~/status` and the ROS graph.
 Isolated service tests cover Square edges, configurable mapping, blocked presses, transition states, stale robot status and L2 re-arming at handover.
 The ROS transport test uses its own ROS domain and unique test topics, including a paused simulation clock with no `/clock` publisher.
 It never sends robot commands or starts a simulation.
