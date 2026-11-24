@@ -30,7 +30,7 @@ class Settings:
     minimum_height: float = 0.2
     maximum_height: float = 1.0
     height_rate: float = 0.05
-    input_timeout: float = 0.25
+    stick_exponent: float = 1.0  # Response curve sign(x)|x|^e on the motion axes; 1 is linear.
     neutral_threshold: float = 0.1
     publish_rate: float = 50.0
 
@@ -58,8 +58,10 @@ class Settings:
                 raise ValueError('Normalized velocity scales must be within [0, 1]')
         if not 0 < self.minimum_height <= self.reference_height <= self.maximum_height:
             raise ValueError('Require 0 < minimum_height <= reference_height <= maximum_height')
-        if self.height_rate <= 0 or self.input_timeout <= 0:
-            raise ValueError('Height rate and input timeout must be positive')
+        if self.height_rate <= 0:
+            raise ValueError('Height rate must be positive')
+        if not 1.0 <= self.stick_exponent <= 3.0:
+            raise ValueError('Stick exponent must be within [1, 3]')
         if not 1 <= self.publish_rate <= 200:
             raise ValueError('Publish rate must be within [1, 200] Hz')
         if not 0 <= self.neutral_threshold < 1:
@@ -130,8 +132,6 @@ class TeleopControl:
             self._last_input = None
             self._last_tick = None
             return
-        if self._last_input is not None and now - self._last_input >= s.input_timeout:
-            self.stop('input_timeout')
         axis_indices = (s.axis_forward, s.axis_lateral, s.axis_yaw)
         button_indices = (
             s.button_height_up, s.button_height_down, s.button_center,
@@ -213,15 +213,16 @@ class TeleopControl:
             return Command(0.0, 0.0, 0.0, self.height)
         dt = 0.0 if self._last_tick is None else max(0.0, now - self._last_tick)
         self._last_tick = now
-        if self._last_input is not None and now - self._last_input >= s.input_timeout:
-            self.stop('input_timeout')
+        # No input timeout, as dric_joystick: the last sample holds until the next one.
         if not self.enabled:
             return Command(0.0, 0.0, 0.0, self.height)
         up, down = self._buttons
         # A delayed callback must not cause a large jump in the height target.
         self.height += (int(up) - int(down)) * s.height_rate * min(dt, 2 / s.publish_rate)
         self.height = max(s.minimum_height, min(s.maximum_height, self.height))
-        forward, lateral, yaw = self._axes
+        forward, lateral, yaw = (
+            math.copysign(abs(a) ** s.stick_exponent, a) for a in self._axes
+        )
         return Command(
             forward * s.sign_forward * s.scale_forward,
             lateral * s.sign_lateral * s.scale_lateral,

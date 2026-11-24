@@ -1,4 +1,4 @@
-"""Verify actual DDS output and a paused-clock timeout on isolated test topics."""
+"""Verify actual DDS output with a paused simulation clock on isolated test topics."""
 
 import json
 import time
@@ -8,7 +8,7 @@ import pytest
 
 
 @pytest.mark.parametrize('bridge', [False, True])
-def test_transport_and_timeout_with_no_simulation_clock(bridge):
+def test_transport_with_no_simulation_clock(bridge):
     pytest.importorskip('rclpy')
     pytest.importorskip('ocs2_msgs')
     from legged_robot_teleop.node import BaseTwistTeleop
@@ -86,12 +86,11 @@ def test_transport_and_timeout_with_no_simulation_clock(bridge):
         count = len(received)
         pump(0.4)
         assert len(received) > count
-        assert received[-1].linear_velocity_x == 0.0
-        assert received[-1].angular_velocity_z == 0.0
-        assert teleop.control.state == 'input_timeout'
-        pump(0.1, [0.0] * 6, pressure=1.0)
-        assert not teleop.control.enabled
+        assert received[-1].linear_velocity_x == 0.25, 'no input timeout: the last command holds'
+        assert teleop.control.enabled
         pump(0.1, [0.0] * 6)
+        assert not teleop.control.enabled
+        assert received[-1].linear_velocity_x == 0.0
         pump(0.1, [0.0] * 6, pressure=1.0)
         assert teleop.control.enabled
         pump(0.1, [0.0, 1.0, 0.0, 0.0, 0.0, 0.0], pressure=1.0)
@@ -115,7 +114,6 @@ def test_transport_and_timeout_with_no_simulation_clock(bridge):
         assert teleop.control.enabled
         assert statuses[-1]['phase'] == 'enabled'
         assert statuses[-1]['enabled']
-        assert any(status['reason'] == 'input_timeout' for status in statuses)
         if bridge:
             assert forwarded and forwarded[-1].axes[4] == -1.0
             info = probe.get_publishers_info_by_topic(joy_topic)

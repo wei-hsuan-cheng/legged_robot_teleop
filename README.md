@@ -53,7 +53,9 @@ The controller owns the posture transition; teleop only calls its `~/toggle_stan
 While the robot is not in locomotion, or its 10 Hz state heartbeat is lost for 0.5 s, the adapter disarms driving.
 After stand-up, release and press L2 again to enable motion.
 Posture control is enabled automatically only when the selected controller YAML defines a planned stand-up; G1/H2 have no new posture-button behavior.
-Input loss longer than 0.25 wall seconds disarms motion; reconnection with L2 held cannot restart it.
+There is no input timeout, as in `dric_joystick`: the last `/joy` sample holds until the next one, and releasing L2 stops motion. If the gamepad link drops while L2 is held, the last command keeps being published and the MPC keeps following it; stop the robot by other means (e.g. reconnect and release L2, or the controller/E-stop).
+
+Stick deflection is shaped as sign(x)|x|^`stick_exponent` (2 in `dualsense.yaml`) for fine low-speed control; full deflection still commands the full scaled speed.
 L2 is axis 4, reported by `game_controller_node` as 0 released to -1 fully pressed.
 The deadman engages at 50% of that ROS range and releases at 20%, avoiding threshold chatter.
 Centered sticks and released Center/height buttons are required at the instant of enabling.
@@ -128,7 +130,7 @@ colcon test --packages-select legged_robot_teleop --event-handlers console_direc
 colcon test-result --verbose
 ```
 
-Unit tests cover signs/scaling, height bounds, release/stop, malformed input, timeouts, and reconnection.
+Unit tests cover signs/scaling, height bounds, release/stop, malformed input, held commands without new input, and the stick response curve.
 FSM regressions cover post-Center re-enabling, trigger hysteresis, blocked-input recovery, clock faults, and 6,000 deterministic randomized input steps.
 Isolated service tests cover Square edges, configurable mapping, blocked presses, transition states, stale robot status and L2 re-arming at handover.
 The ROS transport test uses its own ROS domain and unique test topics, including a paused simulation clock with no `/clock` publisher.

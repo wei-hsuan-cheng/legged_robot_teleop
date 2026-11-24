@@ -17,7 +17,7 @@ The pressure band between 0.2 and 0.5 preserves the previous permission state.
 There is no release debounce delay; a released L2 immediately clears motion commands.
 An unsafe enable attempt consumes that press, so simply centering a stick while L2 remains held cannot unexpectedly start motion.
 Release L2 and retry when the reported blocking input is clear.
-Stale input, malformed input, and nonfinite/backward receipt or timer time also clear permission.
+Malformed input and nonfinite/backward receipt or timer time also clear permission. Silent input does not: there is no input timeout.
 All non-enabled states clear cached motion and D-pad commands, preserving the selected height.
 
 
@@ -52,7 +52,6 @@ The trigger pressure is the last valid input value, not a claim that a disconnec
 | `enable_blocked_sticks_not_centered` | Release L2, center the sticks, then press L2 again |
 | `enable_blocked_center_held` | Release L2 and L1 before trying again |
 | `enable_blocked_height_buttons_held` | Release L2 and D-pad before trying again |
-| `input_timeout` | Check the input stream; reconnect, release L2, then enable again |
 | `invalid_input` | Check driver mapping and message shape |
 | `invalid_time` | Check the receipt/timer time source, then release L2 and retry |
 

@@ -31,7 +31,6 @@ class BaseTwistTeleop(Node):
         if self._posture_button < 0:
             raise ValueError('button_posture must be nonnegative')
         self._posture_button_held = None
-        self._last_joy_receipt = None
         self._posture_future = None
         self._posture_request_time = 0.0
         self._motion_state = 'unknown'
@@ -85,12 +84,7 @@ class BaseTwistTeleop(Node):
     def _receive(self, message):
         if self._joy_publisher is not None:
             self._joy_publisher.publish(message)
-        now = time.monotonic()
-        if (self._last_joy_receipt is None
-                or now - self._last_joy_receipt >= self.control.settings.input_timeout):
-            self._posture_button_held = None
-        self._last_joy_receipt = now
-        self.control.receive(message.axes, message.buttons, now)
+        self.control.receive(message.axes, message.buttons, time.monotonic())
         if self._posture_client is not None:
             self._receive_posture_button(message)
             if self._motion_state != 'locomotion':

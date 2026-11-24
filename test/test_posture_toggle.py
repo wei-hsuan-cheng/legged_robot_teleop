@@ -76,12 +76,6 @@ def test_posture_toggle_requires_release_and_safe_fresh_robot_state(posture_butt
         pump((posture_button, 1), duration=0.3)
         assert len(calls) == 1, 'Autorepeat must not toggle again'
         pump()
-        end = time.monotonic() + .35
-        while time.monotonic() < end:
-            executor.spin_once(timeout_sec=0.01)
-        pump((posture_button,))
-        assert len(calls) == 1, 'Held button after an input gap must not request a posture'
-        pump()
         pump((posture_button,), pressure=1.0)
         pump((posture_button,), pressure=0.0)
         assert len(calls) == 1, 'A blocked posture button is consumed, not queued'

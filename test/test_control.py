@@ -72,23 +72,25 @@ def test_circle_is_unbound_during_arming_and_driving():
     assert not control.enabled, 'L2 release must still stop motion'
 
 
-def test_timeout_and_reconnection_require_fresh_release():
+def test_silent_input_holds_last_command_until_released():
     control = TeleopControl(Settings())
     arm(control)
     control.receive(*sample(axes=(0, 1, 0, 0, 0, 0), pressure=1.0), 0.02)
-    assert control.command(0.03).forward > 0
-    assert control.command(0.28).forward == 0
-    assert control.state == 'input_timeout'
-    control.receive(*sample(pressure=1.0), 0.29)
-    assert not control.enabled
-    arm(control, 0.30)
+    assert control.command(10.0).forward == control.settings.scale_forward
+    assert control.enabled
+    control.receive(*sample(axes=(0, 1, 0, 0, 0, 0)), 10.01)
+    assert control.command(10.02).forward == 0
 
 
-def test_receive_detects_timeout_without_a_timer_callback():
-    control = TeleopControl(Settings())
+def test_stick_exponent_shapes_motion_axes_only():
+    control = TeleopControl(Settings(stick_exponent=2.0, scale_forward=1.0, scale_yaw=1.0))
     arm(control)
-    control.receive(*sample(pressure=1.0), 1.0)
-    assert not control.enabled
+    control.receive(*sample(axes=(0, 0.5, -0.5, 0, 0, 0), pressure=1.0), 0.02)
+    command = control.command(0.03)
+    assert command.forward == pytest.approx(0.25)
+    assert command.yaw == pytest.approx(-0.25)
+    control.receive(*sample(axes=(0, 1.0, 0, 0, 0, 0), pressure=1.0), 0.04)
+    assert control.command(0.05).forward == pytest.approx(1.0)
 
 
 @pytest.mark.parametrize('axes,buttons', [
@@ -160,7 +162,8 @@ def test_upkie_ignores_lateral_axis_and_optional_buttons_can_be_disabled():
 
 @pytest.mark.parametrize('parameters', [
     {'minimum_height': 0.0}, {'reference_height': 2.0},
-    {'height_rate': -0.1}, {'input_timeout': 0.0},
+    {'height_rate': -0.1},
+    {'stick_exponent': 0.5}, {'stick_exponent': math.inf},
     {'scale_forward': 1.1}, {'scale_yaw': math.nan},
     {'axis_enable': -1}, {'button_center': 11},
     {'axis_forward': -2}, {'axis_yaw': 1.0},
@@ -196,13 +199,8 @@ def test_trigger_threshold_hysteresis_and_gradual_press():
     assert control.command(0.05).forward == 0
 
 
-def test_partly_held_trigger_cannot_rearm_after_timeout_or_stop():
+def test_partly_held_trigger_cannot_rearm_after_stop():
     control = TeleopControl(Settings())
-    arm(control)
-    control.command(1.0)
-    control.receive(*sample(pressure=0.3), 1.01)
-    control.receive(*sample(pressure=1.0), 1.02)
-    assert not control.enabled
     arm(control, 1.03)
     control.stop('robot_inactive')
     control.receive(*sample(pressure=0.3), 1.06)

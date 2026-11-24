@@ -92,9 +92,9 @@ Keep L1 held while releasing L2 and check that no deferred Center occurs; releas
 Release L1 before re-enabling L2.
 Circle is unassigned: pressing or releasing it must not stop driving, affect Center or block Square.
 Release L2 to stop motion while keeping the selected height.
-Unplug the cable while commanding motion: output should become zero within approximately 0.25 seconds plus one publish interval, subject to host scheduling.
+There is no input timeout: unplugging the cable (or switching the controller off) while commanding motion keeps the last command. Release L2 after reconnecting to stop; keep another way to stop the robot at hand.
 Reconnect with L2 held and check that it stays disabled until released and enabled again.
-This timeout covers loss of Joy input while teleop is alive, not a killed process or DDS/network failure downstream.
+Neither a killed teleop process nor a DDS/network failure downstream is detected by teleop.
 Do not rely on one final best-effort shutdown packet as an emergency stop.
 
 If a driver is already running, use `startJoy:=false` and its actual `joyTopic` instead of starting a duplicate driver.

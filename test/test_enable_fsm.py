@@ -71,15 +71,13 @@ def test_enabled_hysteresis_does_not_require_neutral_sticks():
     assert control.command(0.07).forward == 0
 
 
-@pytest.mark.parametrize('failure', ['stop', 'timeout', 'malformed'])
+@pytest.mark.parametrize('failure', ['stop', 'malformed'])
 def test_fault_and_center_release_recovery(failure):
     control = TeleopControl(Settings())
     send(control, 0.0)
     send(control, 0.01, 0.6)
     if failure == 'stop':
         control.stop('robot_inactive')
-    elif failure == 'timeout':
-        control.command(0.3)
     else:
         control.receive([], [], 0.02)
     assert control.enable_state is EnableState.WAIT_RELEASE
