@@ -88,7 +88,7 @@ Alternatively, start the robot with `baseCommandDevice:=none`, then run teleop s
 ros2 launch legged_robot_teleop teleop.launch.py robotName:=h2
 ```
 
-Use `robotName:=g1` or `robotName:=upkie` for the other profiles.
+Use `robotName:=g1`, `robotName:=upkie` or `robotName:=pineapple` for the other profiles.
 The launch file reads `defaultBaseHeight`, `minBaseHeight`, and `maxBaseHeight` directly from the selected robot's controller YAML.
 If robot launch uses `controllersFile` or `refBaseHeight`, pass the same values to teleop.
 No robot height settings are duplicated in this package.
@@ -102,7 +102,7 @@ See the [upstream driver documentation](https://github.com/ros-drivers/joystick_
 
 | Argument | Default / Purpose |
 | --- | --- |
-| `robotName` | `g1`; also `h2`, `upkie` |
+| `robotName` | `g1`; also `h2`, `upkie`, `pineapple` |
 | `controllersFile` | Empty: use installed MPC `config/<robot>/ros2_controllers.yaml` |
 | `mpcControllerName` | `humanoid_whole_body_inverse_dynamics_mpc_controller`; YAML key |
 | `refBaseHeight` | Empty: read nominal height from controller YAML |
