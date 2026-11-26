@@ -61,13 +61,13 @@ In `ready`, `center_held`, `height_buttons_held`, and `sticks_not_centered` are 
 
 ## Joystick QoS
 
-The bundled standard driver publishes to `<joyTopic>/raw` using its original publisher QoS.
-The teleop node subscribes to that stream with best effort, volatile, depth 1, processes it, and republishes the unchanged Joy message on `joyTopic` with best effort, volatile, depth 1.
+The bundled standard driver publishes to `<joy_topic>/raw` using its original publisher QoS.
+The teleop node subscribes to that stream with best effort, volatile, depth 1, processes it, and republishes the unchanged Joy message on `joy_topic` with best effort, volatile, depth 1.
 Thus the default public `/joy` topic is best effort without modifying the standard driver or adding another process.
 The relay does not subscribe to its own output, including when absolute and relative names resolve to the same topic.
 Base commands and status also use best effort with depth 1.
 Depth 1 retains the latest sample rather than replaying a queue of older stick commands.
-With `startJoy:=false`, the adapter subscribes directly to the external `joyTopic` using best effort and does not create another publisher there.
+With `start_joy:=false`, the adapter subscribes directly to the external `joy_topic` using best effort and does not create another publisher there.
 An external driver's publisher QoS remains that driver's responsibility.
 Publishing and watchdog checks use steady/monotonic time even when simulation time is paused.
 These protections are not a hardware emergency stop and do not cover adapter process death or downstream command-transport loss.

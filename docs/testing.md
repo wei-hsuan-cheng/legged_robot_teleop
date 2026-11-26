@@ -69,9 +69,9 @@ The following command does not publish to the MPC command topic and does not lau
 ```bash
 source /root/ocs2_ros2_ws/install/setup.bash
 ros2 launch legged_robot_teleop teleop.launch.py \
-  robotName:=h2 \
-  joyTopic:=/teleop/test/joy \
-  commandTopic:=/teleop/test/walking_velocity_command
+  robot_name:=h2 \
+  joy_topic:=/teleop/test/joy \
+  command_topic:=/teleop/test/walking_velocity_command
 ```
 
 In another sourced terminal:
@@ -97,8 +97,8 @@ Reconnect with L2 held and check that it stays disabled until released and enabl
 Neither a killed teleop process nor a DDS/network failure downstream is detected by teleop.
 Do not rely on one final best-effort shutdown packet as an emergency stop.
 
-If a driver is already running, use `startJoy:=false` and its actual `joyTopic` instead of starting a duplicate driver.
-With the bundled driver, `joyTopic` is a best-effort public output; the driver's original stream is on `<joyTopic>/raw`.
+If a driver is already running, use `start_joy:=false` and its actual `joy_topic` instead of starting a duplicate driver.
+With the bundled driver, `joy_topic` is a best-effort public output; the driver's original stream is on `<joy_topic>/raw`.
 Use `ros2 topic info /teleop/test/joy --verbose` to inspect the public publisher QoS in this example.
 If L2 does not enable, inspect the [FSM status and recovery instructions](enable_fsm.md) rather than increasing the timeout or relaxing the neutral-stick guard blindly.
 
@@ -112,8 +112,8 @@ For the integrated launch, stop any standalone gamepad driver and teleop first, 
 
 ```bash
 ros2 launch legged_robot_mpc_controller robot.launch.py \
-  robotName:=h2 mpcFreq:=80 mrtFreq:=1000 \
-  baseCommandDevice:=joystick rviz:=true mujoco_headless:=false
+  robot_name:=h2 mpc_freq:=80 mrt_freq:=1000 \
+  base_command_device:=joystick rviz:=true mujoco_headless:=false
 ```
 
 This starts the gamepad driver and adapter, suppresses the GUI, and shares the robot's height settings automatically.
@@ -122,20 +122,20 @@ For independent teleop launch, start the robot without either input frontend:
 
 ```bash
 ros2 launch legged_robot_mpc_controller robot.launch.py \
-  robotName:=h2 mpcFreq:=80 mrtFreq:=1000 \
-  baseCommandDevice:=none rviz:=true mujoco_headless:=false
+  robot_name:=h2 mpc_freq:=80 mrt_freq:=1000 \
+  base_command_device:=none rviz:=true mujoco_headless:=false
 ```
 
 After initialization and stable standing, run in a second sourced terminal:
 
 ```bash
-ros2 launch legged_robot_teleop teleop.launch.py robotName:=h2
+ros2 launch legged_robot_teleop teleop.launch.py robot_name:=h2
 ```
 
 Test small forward/backward motions first, then yaw, sideways motion, and small height changes.
 Release L2 between each test.
 Repeat the release and disconnect checks in simulation.
-For G1 use `robotName:=g1` in both launches; for Upkie use `robotName:=upkie`, `mpcFreq:=200`, and wait for its stand-up sequence before enabling teleop.
+For G1 use `robot_name:=g1` in both launches; for Upkie use `robot_name:=upkie`, `mpc_freq:=200`, and wait for its stand-up sequence before enabling teleop.
 Upkie supports forward/yaw/height but not independent sideways drive.
 The current full speed scales allow H2's complete 2.0 m/s forward limit; G1/Upkie use their own current maxima.
 Start with small stick deflections, or reduce the teleop speed fractions before the robot test.
@@ -150,4 +150,4 @@ Disconnect the controller's USB cable, hold Create + PS until its light bar flas
 See [Sony pairing instructions](https://www.playstation.com/en-us/support/hardware/pair-dualsense-controller-bluetooth/).
 Parallels' documented macOS virtual-gamepad sharing targets Windows; do not assume it exposes a controller to Linux.
 See [Parallels gamepad support](https://kb.parallels.com/en/124771).
-Enumerate devices again, update `deviceName` if necessary, and repeat the isolated topic and connection-loss checks before driving.
+Enumerate devices again, update `device_name` if necessary, and repeat the isolated topic and connection-loss checks before driving.

@@ -21,12 +21,12 @@ def test_driver_and_external_input_routes(start_joy, monkeypatch):
     monkeypatch.setattr(module, 'Node', lambda **kwargs: kwargs)
     context = LaunchContext()
     context.launch_configurations.update({
-        'controllersFile': '/unused/controllers.yaml',
-        'mpcControllerName': 'controller', 'refBaseHeight': '',
-        'startJoy': start_joy, 'joyTopic': '/test/joy',
-        'deviceName': 'DualSense Wireless Controller',
-        'paramsFile': '/unused/teleop.yaml',
-        'commandTopic': '/test/command',
+        'controllers_file': '/unused/controllers.yaml',
+        'mpc_controller_name': 'controller', 'ref_base_height': '',
+        'start_joy': start_joy, 'joy_topic': '/test/joy',
+        'device_name': 'DualSense Wireless Controller',
+        'params_file': '/unused/teleop.yaml',
+        'command_topic': '/test/command',
     })
     driver, adapter = module._nodes(context)
     assert driver['remappings'] == [('joy', '/test/joy/raw')]

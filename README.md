@@ -81,49 +81,49 @@ With the integrated MPC launch, select `base_twist` mode and run:
 
 ```bash
 ros2 launch legged_robot_mpc_controller robot.launch.py \
-  robotName:=h2 mpcFreq:=80 baseCommandDevice:=joystick
+  robot_name:=h2 mpc_freq:=80 base_command_device:=joystick
 ```
 
-The `baseCommandDevice` selector accepts `gui`, `joystick`, or `none`, so the integrated launch cannot start both command sources.
+The `base_command_device` selector accepts `gui`, `joystick`, or `none`, so the integrated launch cannot start both command sources.
 The robot's resolved controller YAML and effective nominal height are passed through automatically.
 Do not also start a standalone driver or teleop node.
-Alternatively, start the robot with `baseCommandDevice:=none`, then run teleop separately:
+Alternatively, start the robot with `base_command_device:=none`, then run teleop separately:
 
 ```bash
-ros2 launch legged_robot_teleop teleop.launch.py robotName:=h2
+ros2 launch legged_robot_teleop teleop.launch.py robot_name:=h2
 ```
 
-Use `robotName:=g1`, `robotName:=upkie` or `robotName:=pineapple` for the other profiles.
+Use `robot_name:=g1`, `robot_name:=upkie` or `robot_name:=pineapple` for the other profiles.
 The launch file reads `defaultBaseHeight`, `minBaseHeight`, and `maxBaseHeight` directly from the selected robot's controller YAML.
-If robot launch uses `controllersFile` or `refBaseHeight`, pass the same values to teleop.
+If robot launch uses `controllers_file` or `ref_base_height`, pass the same values to teleop.
 No robot height settings are duplicated in this package.
 
 
 ## Configuration
 
-Edit [config/dualsense.yaml](config/dualsense.yaml) or provide a copy with `paramsFile:=/absolute/path.yaml`.
+Edit [config/dualsense.yaml](config/dualsense.yaml) or provide a copy with `params_file:=/absolute/path.yaml`.
 The driver is `game_controller_node`, not `joy_node`; it provides standardized SDL button/axis ordering and already uses positive forward/left ROS signs.
 See the [upstream driver documentation](https://github.com/ros-drivers/joystick_drivers/blob/ros2/joy/README.md).
 
 | Argument | Default / Purpose |
 | --- | --- |
-| `robotName` | `g1`; also `h2`, `upkie`, `pineapple` |
-| `controllersFile` | Empty: use installed MPC `config/<robot>/ros2_controllers.yaml` |
-| `mpcControllerName` | `humanoid_whole_body_inverse_dynamics_mpc_controller`; YAML key |
-| `refBaseHeight` | Empty: read nominal height from controller YAML |
-| `paramsFile` | Installed `config/dualsense.yaml` |
-| `deviceName` | `DualSense Wireless Controller`; takes precedence over `deviceId` |
-| `deviceId` | `0`; clear `deviceName` to select by ID |
-| `startJoy` | `true`; set `false` if a driver is already publishing `joyTopic` |
-| `joyTopic` | `/joy` |
-| `commandTopic` | `/humanoid/walking_velocity_command` |
+| `robot_name` | `g1`; also `h2`, `upkie`, `pineapple` |
+| `controllers_file` | Empty: use installed MPC `config/<robot>/ros2_controllers.yaml` |
+| `mpc_controller_name` | `humanoid_whole_body_inverse_dynamics_mpc_controller`; YAML key |
+| `ref_base_height` | Empty: read nominal height from controller YAML |
+| `params_file` | Installed `config/dualsense.yaml` |
+| `device_name` | `DualSense Wireless Controller`; takes precedence over `device_id` |
+| `device_id` | `0`; clear `device_name` to select by ID |
+| `start_joy` | `true`; set `false` if a driver is already publishing `joy_topic` |
+| `joy_topic` | `/joy` |
+| `command_topic` | `/humanoid/walking_velocity_command` |
 | `use_sim_time` | `false`; watchdog and publishing use wall/steady time either way |
 
 Output velocities are normalized fractions within `[-1, 1]`, not physical m/s or rad/s.
 `desired_pelvis_height` is an absolute height in meters, matching the GUI contract.
-The bundled driver uses `<joyTopic>/raw`; the adapter subscribes with best effort and exposes the unchanged joystick data on public `joyTopic` with best effort, volatile, depth 1.
+The bundled driver uses `<joy_topic>/raw`; the adapter subscribes with best effort and exposes the unchanged joystick data on public `joy_topic` with best effort, volatile, depth 1.
 Commands and `~/status` diagnostics also use best effort, volatile, depth 1.
-With `startJoy:=false`, the adapter directly consumes the external topic using best effort; that external publisher's QoS is not changed.
+With `start_joy:=false`, the adapter directly consumes the external topic using best effort; that external publisher's QoS is not changed.
 Only one base-command source may publish at once; disable the GUI and scripted targets before using teleop.
 Axis/button mapping and safety parameters are read-only after startup; restart to apply a new mapping.
 Optional motion-axis and height-button indices can be `-1` to disable them; the enable axis and stop button are always required.

@@ -17,27 +17,27 @@ def _nodes(context):
     def value(name):
         return LaunchConfiguration(name).perform(context)
 
-    controllers_file = value('controllersFile')
+    controllers_file = value('controllers_file')
     if not controllers_file:
         controllers_file = str(
             Path(get_package_share_directory('legged_robot_mpc_controller'))
-            / 'config' / value('robotName') / 'ros2_controllers.yaml'
+            / 'config' / value('robot_name') / 'ros2_controllers.yaml'
         )
     profile, lateral_enabled = load_robot_profile(
-        controllers_file, value('mpcControllerName'), value('refBaseHeight'),
+        controllers_file, value('mpc_controller_name'), value('ref_base_height'),
     )
     if not lateral_enabled:
         profile['scale_lateral'] = 0.0
-    start_joy = IfCondition(LaunchConfiguration('startJoy')).evaluate(context)
-    joy_topic = value('joyTopic')
+    start_joy = IfCondition(LaunchConfiguration('start_joy')).evaluate(context)
+    joy_topic = value('joy_topic')
     driver_topic = joy_topic.rstrip('/') + '/raw'
     return [
         Node(
             package='joy', executable='game_controller_node', name='game_controller_node',
-            output='screen', condition=IfCondition(LaunchConfiguration('startJoy')),
+            output='screen', condition=IfCondition(LaunchConfiguration('start_joy')),
             parameters=[{
-                'device_id': ParameterValue(LaunchConfiguration('deviceId'), value_type=int),
-                'device_name': value('deviceName'),
+                'device_id': ParameterValue(LaunchConfiguration('device_id'), value_type=int),
+                'device_name': value('device_name'),
                 'deadzone': 0.08,
                 'autorepeat_rate': 50.0,
                 'sticky_buttons': False,
@@ -46,10 +46,10 @@ def _nodes(context):
         ),
         Node(
             package='legged_robot_teleop', executable='base_twist', name='base_twist_teleop',
-            output='screen', parameters=[value('paramsFile'), profile, {
+            output='screen', parameters=[value('params_file'), profile, {
                 'joy_topic': joy_topic,
                 'joy_source_topic': driver_topic if start_joy else joy_topic,
-                'command_topic': value('commandTopic'),
+                'command_topic': value('command_topic'),
                 'use_sim_time': ParameterValue(
                     LaunchConfiguration('use_sim_time'), value_type=bool,
                 ),
@@ -63,27 +63,27 @@ def generate_launch_description():
     share = Path(get_package_share_directory('legged_robot_teleop'))
     return LaunchDescription([
         DeclareLaunchArgument(
-            'robotName', default_value='g1', choices=['g1', 'h2', 'upkie', 'pineapple'],
+            'robot_name', default_value='g1', choices=['g1', 'h2', 'upkie', 'pineapple'],
             description='Robot profile; reads heights from its controller YAML.',
         ),
-        DeclareLaunchArgument('controllersFile', default_value=''),
+        DeclareLaunchArgument('controllers_file', default_value=''),
         DeclareLaunchArgument(
-            'mpcControllerName',
+            'mpc_controller_name',
             default_value='humanoid_whole_body_inverse_dynamics_mpc_controller',
         ),
         DeclareLaunchArgument(
-            'refBaseHeight', default_value='',
+            'ref_base_height', default_value='',
             description='Optional height override [m]; match the robot launch override.',
         ),
-        DeclareLaunchArgument('paramsFile', default_value=str(share / 'config/dualsense.yaml')),
-        DeclareLaunchArgument('deviceId', default_value='0'),
-        DeclareLaunchArgument('deviceName', default_value='DualSense Wireless Controller'),
+        DeclareLaunchArgument('params_file', default_value=str(share / 'config/dualsense.yaml')),
+        DeclareLaunchArgument('device_id', default_value='0'),
+        DeclareLaunchArgument('device_name', default_value='DualSense Wireless Controller'),
         DeclareLaunchArgument(
-            'startJoy', default_value='true',
-            description='False when an existing driver already publishes joyTopic.',
+            'start_joy', default_value='true',
+            description='False when an existing driver already publishes joy_topic.',
         ),
-        DeclareLaunchArgument('joyTopic', default_value='/joy'),
-        DeclareLaunchArgument('commandTopic', default_value='/humanoid/walking_velocity_command'),
+        DeclareLaunchArgument('joy_topic', default_value='/joy'),
+        DeclareLaunchArgument('command_topic', default_value='/humanoid/walking_velocity_command'),
         DeclareLaunchArgument('use_sim_time', default_value='false'),
         OpaqueFunction(function=_nodes),
     ])

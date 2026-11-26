@@ -7,7 +7,7 @@ New standalone ROS 2 Jazzy package `legged_robot_teleop` in `/Users/whcheng/src/
 The user authorized a public `wei-hsuan-cheng/legged_robot_teleop` repository and a VCS entry in `legged_robot_mpc_controller`.
 The adapter uses standard `joy/game_controller_node`, not a custom hardware driver.
 No robot MPC model, solver, estimator, scene, or gains are changed.
-At the user's subsequent request, `robot.launch.py` uses one string selector, `baseCommandDevice:=gui|joystick|none`, default `gui`.
+At the user's subsequent request, `robot.launch.py` uses one string selector, `base_command_device:=gui|joystick|none`, default `gui`.
 `joystick` includes this package's launch; `gui` starts the GUI; `none` leaves input to scripted or external commands.
 The old GUI boolean is retired, and GUI/teleop cannot coexist through the launch selector.
 It forwards the already-resolved controller file and nominal height, avoiding duplicate robot settings.
@@ -47,7 +47,7 @@ All 39 package checks passed, including 29 command-control cases, seven profile 
 The MPC launch selector passed all three modes without launching nodes.
 After moving the checkout into `mpc/`, the package was rebuilt to refresh its Python development links.
 The MPC Release rebuild also passed (42.5 seconds); existing signedness warnings remain in its native model test.
-Installed robot launch argument discovery confirms `baseCommandDevice` and the teleop include.
+Installed robot launch argument discovery confirms `base_command_device` and the teleop include.
 All 39 package checks passed again after relocation, with no warnings after running Python lint before the DDS test.
 The three input-selection checks plus seven MPC package-health checks passed (10 total).
 No live-device launch, robot simulation, or production command publishing is performed during this build-only checkpoint.
@@ -74,7 +74,7 @@ Do not start a robot or publish to `/humanoid/walking_velocity_command` during i
 ## Next Milestones
 
 1. Let the user verify actual stick signs, height controls, release, unplug, and reconnect on the isolated topic.
-2. User-controlled flat-ground simulation with `baseCommandDevice:=joystick`.
+2. User-controlled flat-ground simulation with `base_command_device:=joystick`.
 3. Optional persistent Docker input hotplug configuration, without disrupting current robot jobs.
 4. Optional direct Ubuntu Bluetooth pairing and repeated disconnect acceptance.
 
@@ -89,8 +89,8 @@ Unsafe enable attempts, stop, malformed input, stale input, and invalid time req
 L2 thresholds, the 0.25-second timeout, 100 Hz command publishing, full speed fractions, and 0.2 m/s height rate are unchanged.
 Blocked reasons remain latched until a valid release and are logged with the phase and trigger pressure.
 Best-effort `~/status` publishes a JSON diagnostic on reason changes and once per second.
-The standard driver now outputs to `<joyTopic>/raw`; the same adapter node subscribes best effort at depth 1 and republishes public `joyTopic` best effort at depth 1, without modifying the driver or adding a process.
-The standard driver's raw publisher retains its original QoS; external drivers used with `startJoy:=false` keep their own publisher QoS.
+The standard driver now outputs to `<joy_topic>/raw`; the same adapter node subscribes best effort at depth 1 and republishes public `joy_topic` best effort at depth 1, without modifying the driver or adding a process.
+The standard driver's raw publisher retains its original QoS; external drivers used with `start_joy:=false` keep their own publisher QoS.
 Tests cover direct and bridged real DDS paths, public publisher reliability, local depth-1 profiles, no alias-induced relay loop, and 6,000 randomized safety-invariant steps.
 Some DDS discovery implementations report history depth as zero, so tests check reliability through discovery and depth through the actual rclpy publisher profile.
 See [FSM documentation](docs/enable_fsm.md) for exact transition and recovery rules.
