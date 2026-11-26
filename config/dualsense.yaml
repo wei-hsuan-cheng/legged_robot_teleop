@@ -25,4 +25,6 @@ base_twist_teleop:
     button_height_down: 12 # D-pad down, while L2 is held.
     button_center: 9 # L1: zero motion and nominal height, only with L2 released.
     button_posture: 2 # Square (SDL X): stand/sit toggle, only with L2 released.
+    button_gait_cycle: 1 # Circle (SDL B): walk -> trot -> wheel_drive, in locomotion (robots with a planned stand-up).
+    button_gait_hold: 3 # Triangle (SDL Y): jump while held, in locomotion.
     height_rate: 0.2 # m/s; heights and bounds come from the robot controller YAML.

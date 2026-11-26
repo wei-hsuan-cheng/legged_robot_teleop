@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdio>
 #include <functional>
+#include <sstream>
 #include <stdexcept>
 
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
@@ -45,6 +46,26 @@ BaseTwistTeleop::BaseTwistTeleop(const rclcpp::NodeOptions & options)
   posture_button_ = static_cast<int>(declare_parameter<int64_t>("button_posture", 2, descriptor));
   if (posture_button_ < 0) {
     throw std::invalid_argument("button_posture must be nonnegative");
+  }
+
+  const auto gait_topic = declare_parameter<std::string>("gait_topic", "", descriptor);
+  const auto gait_cycle = declare_parameter<std::string>("gait_cycle", "", descriptor);
+  gait_hold_ = declare_parameter<std::string>("gait_hold", "", descriptor);
+  gait_cycle_button_ = static_cast<int>(declare_parameter<int64_t>("button_gait_cycle", 1, descriptor));
+  gait_hold_button_ = static_cast<int>(declare_parameter<int64_t>("button_gait_hold", 3, descriptor));
+  std::stringstream names(gait_cycle);
+  for (std::string name; std::getline(names, name, ',');) {
+    if (!name.empty()) {
+      gait_cycle_.push_back(name);
+    }
+  }
+  if (!gait_topic.empty()) {
+    if (gait_cycle_button_ < 0 || gait_hold_button_ < 0 || gait_cycle_button_ == gait_hold_button_ ||
+      gait_cycle_button_ == posture_button_ || gait_hold_button_ == posture_button_)
+    {
+      throw std::invalid_argument("gait buttons must be distinct, nonnegative and not the posture button");
+    }
+    gait_publisher_ = create_publisher<std_msgs::msg::String>(gait_topic, rclcpp::QoS(1).reliable());
   }
 
   if (!posture_controller.empty()) {
@@ -125,6 +146,9 @@ void BaseTwistTeleop::receive(const sensor_msgs::msg::Joy::ConstSharedPtr & mess
   // float32 axes widened to double, as rclpy did.
   control_->receive(
     std::vector<double>(message->axes.begin(), message->axes.end()), message->buttons, monotonic());
+  if (gait_publisher_) {
+    receiveGaitButtons(*message);
+  }
   if (posture_client_) {
     receivePostureButton(*message);
     if (motion_state_ != "locomotion") {
@@ -198,6 +222,44 @@ void BaseTwistTeleop::receivePostureButton(const sensor_msgs::msg::Joy & message
       }
     });
   posture_request_id_ = future_and_id.request_id;
+}
+
+void BaseTwistTeleop::publishGait(const std::string & gait)
+{
+  if (gait == gait_sent_) {
+    return;
+  }
+  std_msgs::msg::String message;
+  message.data = gait;
+  gait_publisher_->publish(message);
+  gait_sent_ = gait;
+  RCLCPP_INFO(get_logger(), "Gait: %s", gait.empty() ? "ladder (wheel_drive)" : gait.c_str());
+}
+
+void BaseTwistTeleop::receiveGaitButtons(const sensor_msgs::msg::Joy & message)
+{
+  const auto held = [&](int i) {
+      return i < static_cast<int>(message.buttons.size()) && message.buttons[i] != 0;
+    };
+  const bool cycle = held(gait_cycle_button_);
+  const bool hold = held(gait_hold_button_);
+  // A button held at connection, or while not in locomotion, counts only after a release.
+  const bool cycle_edge = gait_cycle_held_.has_value() && !*gait_cycle_held_ && cycle;
+  gait_cycle_held_ = cycle;
+  if (motion_state_ != "locomotion" && posture_client_) {
+    gait_selection_ = 0;
+    gait_hold_armed_ = false;
+    publishGait("");
+    return;
+  }
+  if (!hold) {
+    gait_hold_armed_ = true;
+  }
+  if (cycle_edge && !gait_cycle_.empty()) {
+    gait_selection_ = (gait_selection_ + 1) % (gait_cycle_.size() + 1);
+  }
+  const std::string selected = gait_selection_ == 0 ? std::string() : gait_cycle_[gait_selection_ - 1];
+  publishGait(hold && gait_hold_armed_ && !gait_hold_.empty() ? gait_hold_ : selected);
 }
 
 void BaseTwistTeleop::stopAndPublish(const std::string & reason)

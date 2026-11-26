@@ -38,13 +38,18 @@ See [connection and testing](docs/testing.md) for USB, Docker, isolated topic ch
 | Right stick horizontal | Yaw rate |
 | D-pad up/down, with L2 | Increase/decrease base height |
 | L1, with L2 released | Center: zero velocity/yaw and restore nominal base height |
-| Square, with L2 released | Upkie: toggle Stand Up / Sit Down, with centered sticks |
-| Circle | Unassigned; reserved for future use |
+| Square, with L2 released | Upkie, Pineapple: toggle Stand Up / Sit Down, with centered sticks |
+| Circle, in locomotion | Upkie, Pineapple: cycle the gait walk -> trot -> wheel_drive (the velocity ladder) |
+| Triangle held, in locomotion | Upkie, Pineapple: jump while held, then back to the Circle selection |
 | Release L2 or lose input | Zero velocity/yaw, keep the selected height |
 
 The launch YAML currently uses 100% of the MPC's configured maximum speeds; start with small stick deflections.
 Lower the fractions in `config/dualsense.yaml` for slower joystick control without changing MPC tuning.
-Upkie's robot profile disables independent sideways commands.
+Upkie's robot profile disables independent sideways commands (its `maxDisplacementVelocityY` is 0); Pineapple's
+enables them: a sideways command makes its MPC step (trot) with the hip ab/ad, since the tires cannot roll sideways.
+The gait buttons publish the controller's `target.gaitTopic` (`/humanoid/gait_command`), only for robots with a planned
+stand-up and only the templates the controller defines; leaving locomotion (sit-down, fall) returns to the ladder and
+a button held at that moment counts only after a release.
 For Upkie, Square requests stand-up from idle or sit-down from locomotion; intermediate and fallen/fault states refuse it.
 Square also requires L1 and D-pad released.
 Held Square never repeats or queues a blocked request; release and press again.

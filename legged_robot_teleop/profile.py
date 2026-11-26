@@ -7,7 +7,7 @@ import yaml
 
 
 def load_robot_profile(path, controller_name, height_override=''):
-    """Return height limits and lateral-drive support without duplicating profiles."""
+    """Return height limits, lateral drive and gait buttons without duplicating profiles."""
     with Path(path).open(encoding='utf-8') as stream:
         config = yaml.safe_load(stream)
     reference = config[controller_name]['ros__parameters']['ocs2']['reference']
@@ -19,10 +19,20 @@ def load_robot_profile(path, controller_name, height_override=''):
         raise ValueError('Robot reference parameters must be finite')
     if not 0 < minimum <= height <= maximum or lateral < 0:
         raise ValueError('Invalid robot height bounds or lateral velocity limit')
+    parameters = config[controller_name]['ros__parameters']
+    posture = bool(parameters.get('bringUp', {}).get('standUpTrajectoryFile'))
+    # Gait buttons for the robots with a planned stand-up (Upkie, Pineapple): Circle cycles
+    # the stepping gaits, Triangle holds the jump, each only if the controller defines it.
+    templates = parameters.get('ocs2', {}).get('gait', {}).get('templates', {}).get('names', [])
+    cycle = [name for name in ('walk', 'trot') if name in templates] if posture else []
+    hold = 'jump' if posture and 'jump' in templates else ''
     return {
         'reference_height': height,
         'minimum_height': minimum,
         'maximum_height': maximum,
-        'posture_controller': ('/' + controller_name if config[controller_name]['ros__parameters']
-                               .get('bringUp', {}).get('standUpTrajectoryFile') else ''),
+        'posture_controller': '/' + controller_name if posture else '',
+        'gait_topic': (parameters.get('target', {}).get('gaitTopic', '/humanoid/gait_command')
+                       if cycle or hold else ''),
+        'gait_cycle': ','.join(cycle),
+        'gait_hold': hold,
     }, lateral > 0

@@ -64,7 +64,7 @@ if(BUILD_TESTING)
     ament_add_pytest_test(test_${test_name} test/test_${test_name}.py)
   endforeach()
   # ROS-level tests drive the built executable on isolated topics and domains.
-  foreach(test_name ros_transport posture_toggle)
+  foreach(test_name ros_transport posture_toggle gait_buttons)
     ament_add_pytest_test(test_${test_name} test/test_${test_name}.py
       ENV TELEOP_EXECUTABLE=$<TARGET_FILE:base_twist>
       TIMEOUT 120)

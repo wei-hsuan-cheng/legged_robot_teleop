@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <ocs2_msgs/msg/walking_velocity_command.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -31,6 +32,8 @@ private:
   void receive(const sensor_msgs::msg::Joy::ConstSharedPtr & message);
   void receiveMotionState(const std_msgs::msg::String::ConstSharedPtr & message);
   void receivePostureButton(const sensor_msgs::msg::Joy & message);
+  void receiveGaitButtons(const sensor_msgs::msg::Joy & message);
+  void publishGait(const std::string & gait);
   void publish();
   static double monotonic();
 
@@ -45,6 +48,18 @@ private:
   std::optional<std::string> last_state_;
   double last_status_time_ = 0.0;
 
+  // Gait buttons: the cycle button steps through gait_cycle_ and back to the velocity ladder (""); the hold
+  // button requests gait_hold_ while held. Only in locomotion.
+  std::vector<std::string> gait_cycle_;
+  std::string gait_hold_;
+  int gait_cycle_button_;
+  int gait_hold_button_;
+  size_t gait_selection_ = 0;  // 0: ladder, k: gait_cycle_[k - 1]
+  std::optional<bool> gait_cycle_held_;
+  bool gait_hold_armed_ = false;  // the hold button was seen released in locomotion
+  std::string gait_sent_;
+
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr gait_publisher_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr posture_client_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr motion_state_subscription_;
   rclcpp::Publisher<ocs2_msgs::msg::WalkingVelocityCommand>::SharedPtr publisher_;
