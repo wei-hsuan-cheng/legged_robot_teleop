@@ -10,6 +10,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(ocs2_msgs REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -32,6 +33,7 @@ target_link_libraries(base_twist_teleop PUBLIC
   ${rcl_interfaces_TARGETS}
   rclcpp::rclcpp
   rclcpp_components::component
+  ${geometry_msgs_TARGETS}
   ${sensor_msgs_TARGETS}
   ${std_msgs_TARGETS}
   ${std_srvs_TARGETS})
@@ -72,5 +74,5 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-ament_export_dependencies(ocs2_msgs rclcpp rclcpp_components sensor_msgs std_msgs std_srvs)
+ament_export_dependencies(geometry_msgs ocs2_msgs rclcpp rclcpp_components sensor_msgs std_msgs std_srvs)
 ament_package()

@@ -37,7 +37,8 @@ See [connection and testing](docs/testing.md) for USB, Docker, isolated topic ch
 | Left stick | Forward/backward and left/right |
 | Right stick horizontal | Yaw rate |
 | D-pad up/down, with L2 | Increase/decrease base height |
-| L1, with L2 released | Center: zero velocity/yaw and restore nominal base height |
+| D-pad left/right, with L2 | Upkie, Pineapple: lean the trunk left/right (roll), up to the robot's `maxBaseRoll`; held when L2 is released |
+| L1, with L2 released | Center: zero velocity/yaw, restore nominal base height and level the trunk |
 | Square, with L2 released | Upkie, Pineapple: toggle Stand Up / Sit Down, with centered sticks |
 | Circle, in locomotion | Upkie, Pineapple: cycle the gait walk -> trot -> wheel_drive (the velocity ladder) |
 | Triangle held, in locomotion | Upkie, Pineapple: jump while held, then back to the Circle selection |
@@ -111,6 +112,8 @@ See the [upstream driver documentation](https://github.com/ros-drivers/joystick_
 | `controllers_file` | Empty: use installed MPC `config/<robot>/ros2_controllers.yaml` |
 | `mpc_controller_name` | `humanoid_whole_body_inverse_dynamics_mpc_controller`; YAML key |
 | `ref_base_height` | Empty: read nominal height from controller YAML |
+| `maximum_roll`, `orientation_topic` | From the controller YAML (`ocs2.reference.maxBaseRoll`, `target.baseOrientationTopic`); 0 turns the roll buttons off |
+| `button_roll_left`, `button_roll_right`, `roll_rate` | D-pad left 13, right 14 (SDL), 0.3 rad/s |
 | `params_file` | Installed `config/dualsense.yaml` |
 | `device_name` | `DualSense Wireless Controller`; takes precedence over `device_id` |
 | `device_id` | `0`; clear `device_name` to select by ID |
@@ -121,6 +124,8 @@ See the [upstream driver documentation](https://github.com/ros-drivers/joystick_
 
 Output velocities are normalized fractions within `[-1, 1]`, not physical m/s or rad/s.
 `desired_pelvis_height` is an absolute height in meters, matching the GUI contract.
+For robots with a roll limit the node also publishes `geometry_msgs/Vector3` on `orientation_topic` (x roll [rad], positive leans right; y pitch, 0) at the same rate; the roll levels when the robot leaves locomotion.
+How the controller turns it into leg lengths, with results and sources: legged_robot_mpc_controller `docs/base_orientation_control.md`.
 The bundled driver uses `<joy_topic>/raw`; the adapter subscribes with best effort and exposes the unchanged joystick data on public `joy_topic` with best effort, volatile, depth 1.
 Commands and `~/status` diagnostics also use best effort, volatile, depth 1.
 With `start_joy:=false`, the adapter directly consumes the external topic using best effort; that external publisher's QoS is not changed.
@@ -136,7 +141,7 @@ colcon test --packages-select legged_robot_teleop --event-handlers console_direc
 colcon test-result --verbose
 ```
 
-C++ unit tests (gtest, `test/test_control.cpp`) cover signs/scaling, height bounds, release/stop, malformed input, held commands without new input, the stick response curve, and the enable FSM: post-Center re-enabling, trigger hysteresis, blocked-input recovery, clock faults, and 6,000 deterministic randomized input steps.
+C++ unit tests (gtest, `test/test_control.cpp`) cover signs/scaling, height bounds, release/stop, malformed input, held commands without new input, the stick response curve, the D-pad roll (limits, hold on release, Center, ignored without a roll limit), and the enable FSM: post-Center re-enabling, trigger hysteresis, blocked-input recovery, clock faults, and 6,000 deterministic randomized input steps.
 The ROS-level pytest tests start the built `base_twist` executable and observe it only through topics, `~/status` and the ROS graph.
 Isolated service tests cover Square edges, configurable mapping, blocked presses, transition states, stale robot status and L2 re-arming at handover.
 The ROS transport test uses its own ROS domain and unique test topics, including a paused simulation clock with no `/clock` publisher.

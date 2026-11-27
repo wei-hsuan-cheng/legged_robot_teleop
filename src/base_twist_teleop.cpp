@@ -41,6 +41,8 @@ BaseTwistTeleop::BaseTwistTeleop(const rclcpp::NodeOptions & options)
   const auto joy_source_topic = declare_parameter<std::string>("joy_source_topic", "", descriptor);
   const auto command_topic = declare_parameter<std::string>(
     "command_topic", "/humanoid/walking_velocity_command", descriptor);
+  const auto orientation_topic = declare_parameter<std::string>(
+    "orientation_topic", "/humanoid/base_orientation_command", descriptor);
   const auto posture_controller = declare_parameter<std::string>(
     "posture_controller", "", descriptor);
   posture_button_ = static_cast<int>(declare_parameter<int64_t>("button_posture", 2, descriptor));
@@ -102,16 +104,23 @@ BaseTwistTeleop::BaseTwistTeleop(const rclcpp::NodeOptions & options)
   integer("button_height_up", s.button_height_up);
   integer("button_height_down", s.button_height_down);
   integer("button_center", s.button_center);
+  integer("button_roll_left", s.button_roll_left);
+  integer("button_roll_right", s.button_roll_right);
   real("reference_height", s.reference_height);
   real("minimum_height", s.minimum_height);
   real("maximum_height", s.maximum_height);
   real("height_rate", s.height_rate);
+  real("maximum_roll", s.maximum_roll);
+  real("roll_rate", s.roll_rate);
   real("neutral_threshold", s.neutral_threshold);
   real("stick_exponent", s.stick_exponent);
   real("publish_rate", s.publish_rate);
   control_ = std::make_unique<TeleopControl>(s);
 
   publisher_ = create_publisher<ocs2_msgs::msg::WalkingVelocityCommand>(command_topic, bestEffort());
+  if (s.maximum_roll > 0.0 && !orientation_topic.empty()) {
+    orientation_publisher_ = create_publisher<geometry_msgs::msg::Vector3>(orientation_topic, bestEffort());
+  }
   const std::string source_topic = joy_source_topic.empty() ? joy_topic : joy_source_topic;
   const auto topics = get_node_topics_interface();
   if (topics->resolve_topic_name(source_topic) != topics->resolve_topic_name(joy_topic)) {
@@ -163,6 +172,7 @@ void BaseTwistTeleop::receiveMotionState(const std_msgs::msg::String::ConstShare
   motion_state_time_ = monotonic();
   if (message->data != "locomotion") {
     control_->stop("robot_" + message->data);
+    control_->resetRoll();
   }
 }
 
@@ -290,6 +300,11 @@ void BaseTwistTeleop::publish()
   message.angular_velocity_z = command.yaw;
   message.desired_pelvis_height = command.height;
   publisher_->publish(message);
+  if (orientation_publisher_) {
+    geometry_msgs::msg::Vector3 orientation;
+    orientation.x = command.roll;  // pitch (y) is not commanded yet
+    orientation_publisher_->publish(orientation);
+  }
 
   const std::string & state = control_->state();
   const bool changed = !last_state_ || *last_state_ != state;

@@ -147,3 +147,16 @@ Regression tests cover ignored Circle while arming/driving, Center with Circle h
 The shared package built in both the OCS2 and TurboMPC workspaces; each passed all 82 checks without errors, failures or skips.
 No robot launch was started or stopped for these isolated checks.
 The user requested pushing the shared-package change and synchronized operator guides.
+
+
+## Trunk Roll on the D-pad (2026-11-27)
+
+The user asked for trunk roll on the DualSense D-pad left/right (pitch later).
+With L2 held, D-pad left (13) / right (14) ramps the roll at `roll_rate` (0.3 rad/s), clamped to `maximum_roll`; right leans right (positive roll about the forward axis).
+The roll holds when L2 is released, L1 Center levels it with the height, and it levels whenever the robot leaves locomotion.
+Held roll buttons block enabling like the height buttons; without a roll limit (`maximum_roll` 0, every robot but Upkie and Pineapple) the buttons are ignored and need not exist in the Joy message.
+The node publishes `geometry_msgs/Vector3` (x roll, y pitch 0) on `orientation_topic` only when the robot has a roll limit; `profile.py` reads `ocs2.reference.maxBaseRoll` and `target.baseOrientationTopic` from the controller YAML.
+The controller side (per-leg posture, command frame, levelling) is in legged_robot_mpc_controller `docs/base_orientation_control.md`, with the paper and patent sources.
+58 tests pass (new: two gtest roll cases and a profile case); headless Upkie and Pineapple runs driven by synthetic Joy through this node rolled to 0.175 / 0.181 rad and back to level on L1.
+The physical DualSense was not tested.
+

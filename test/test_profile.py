@@ -22,8 +22,23 @@ def test_profile_disables_sideways_drive(controllers):
     assert profile == {
         'reference_height': 0.22, 'minimum_height': 0.2, 'maximum_height': 0.33,
         'posture_controller': '', 'gait_topic': '', 'gait_cycle': '', 'gait_hold': '',
+        'maximum_roll': 0.0, 'orientation_topic': '/humanoid/base_orientation_command',
     }
     assert not lateral
+
+
+def test_roll_limit_and_topic_come_from_the_controller(controllers):
+    config = yaml.safe_load(controllers.read_text())
+    parameters = config['controller']['ros__parameters']
+    parameters['ocs2']['reference']['maxBaseRoll'] = 0.25
+    parameters['target'] = {'baseOrientationTopic': '/robot/orientation'}
+    controllers.write_text(yaml.safe_dump(config))
+    profile, _ = load_robot_profile(controllers, 'controller')
+    assert (profile['maximum_roll'], profile['orientation_topic']) == (0.25, '/robot/orientation')
+    parameters['ocs2']['reference']['maxBaseRoll'] = -0.1
+    controllers.write_text(yaml.safe_dump(config))
+    with pytest.raises(ValueError):
+        load_robot_profile(controllers, 'controller')
 
 
 def test_reference_height_override(controllers):

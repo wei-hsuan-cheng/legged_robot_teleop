@@ -207,6 +207,47 @@ TEST(Control, HeightLimitsAndCenter)
   EXPECT_FALSE(control.enabled());
 }
 
+TEST(Control, RollLimitsCenterAndReset)
+{
+  TeleopControl control{with([](Settings & s) {s.maximum_roll = 0.25; s.roll_rate = 0.5;})};
+  arm(control);
+  // D-pad right (14) leans right, up to +maximum_roll.
+  for (int i = 1; i < 50; ++i) {
+    receive(control, sample({14}, stick(0), 1.0), 0.02 * i);
+    control.command(0.02 * i);
+  }
+  EXPECT_DOUBLE_EQ(control.roll(), 0.25);
+  // D-pad left (13) leans left, down to -maximum_roll; the height does not move.
+  for (int i = 50; i < 150; ++i) {
+    receive(control, sample({13}, stick(0), 1.0), 0.02 * i);
+    control.command(0.02 * i);
+  }
+  EXPECT_DOUBLE_EQ(control.roll(), -0.25);
+  EXPECT_EQ(control.height(), 0.6);
+  // Released L2 holds the roll; L1 (Center) levels it.
+  receive(control, sample({}, stick(0), 0.0), 3.1);
+  EXPECT_DOUBLE_EQ(control.command(3.12).roll, -0.25);
+  receive(control, sample({9}), 3.2);
+  EXPECT_EQ(control.command(3.22).roll, 0.0);
+  arm(control, 3.3);
+  receive(control, sample({14}, stick(0), 1.0), 3.4);
+  control.command(3.42);
+  EXPECT_GT(control.roll(), 0.0);
+  control.resetRoll();
+  EXPECT_EQ(control.roll(), 0.0);
+}
+
+TEST(Control, RollButtonsAreIgnoredWithoutARollLimit)
+{
+  TeleopControl control{Settings{}};
+  arm(control);
+  for (int i = 1; i < 20; ++i) {
+    receive(control, sample({14}, stick(0), 1.0), 0.02 * i);
+    EXPECT_TRUE(control.enabled());
+    EXPECT_EQ(control.command(0.02 * i).roll, 0.0);
+  }
+}
+
 TEST(Control, BothHeightButtonsCancelAndDisabledHeightIsIgnored)
 {
   TeleopControl control{Settings{}};

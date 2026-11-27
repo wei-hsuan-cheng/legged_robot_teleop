@@ -29,10 +29,14 @@ struct Settings
   int button_height_up = 11;
   int button_height_down = 12;
   int button_center = 9;
+  int button_roll_left = 13;
+  int button_roll_right = 14;
   double reference_height = 0.6;
   double minimum_height = 0.2;
   double maximum_height = 1.0;
   double height_rate = 0.05;
+  double maximum_roll = 0.0;  // [rad]; 0 disables the roll buttons (the robot has no commanded roll).
+  double roll_rate = 0.3;  // [rad/s]
   double neutral_threshold = 0.1;
   double stick_exponent = 1.0;  // sign(x)|x|^e on the motion axes; 1 is linear.
   double publish_rate = 50.0;
@@ -41,13 +45,14 @@ struct Settings
   void validate() const;
 };
 
-/// Normalized velocities and absolute base height in meters.
+/// Normalized velocities, absolute base height in meters and trunk roll in radians (positive leans right).
 struct Command
 {
   double forward;
   double lateral;
   double yaw;
   double height;
+  double roll;
 };
 
 /// Single source of truth for trigger permission, separate from status reasons.
@@ -68,6 +73,10 @@ public:
   bool enabled() const {return enable_state_ == EnableState::Enabled;}
   const std::string & state() const {return state_;}
   double height() const {return height_;}
+  double roll() const {return roll_;}
+
+  /// Level the trunk (e.g. while the robot is not in locomotion); the height is kept.
+  void resetRoll() {roll_ = 0.0;}
   double lastTriggerPressure() const {return last_trigger_pressure_;}
 
   /// Clear permission to move without changing the selected height.
@@ -84,13 +93,14 @@ private:
 
   Settings settings_;
   double height_;
+  double roll_ = 0.0;
   std::string state_ = "waiting_for_input";
   EnableState enable_state_ = EnableState::WaitRelease;
   double last_trigger_pressure_ = 0.0;
   std::optional<double> last_input_;
   std::optional<double> last_tick_;
   std::array<double, 3> axes_{0.0, 0.0, 0.0};
-  std::array<bool, 2> buttons_{false, false};
+  std::array<bool, 4> buttons_{false, false, false, false};  // height up/down, roll left/right
   bool center_pressed_ = false;
 };
 

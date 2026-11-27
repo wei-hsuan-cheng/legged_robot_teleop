@@ -26,8 +26,15 @@ def load_robot_profile(path, controller_name, height_override=''):
     templates = parameters.get('ocs2', {}).get('gait', {}).get('templates', {}).get('names', [])
     cycle = [name for name in ('walk', 'trot') if name in templates] if posture else []
     hold = 'jump' if posture and 'jump' in templates else ''
+    # Trunk roll (D-pad left/right) for controllers that take it; 0 leaves the roll buttons off.
+    max_roll = float(reference.get('maxBaseRoll', 0.0) or 0.0)
+    if not math.isfinite(max_roll) or max_roll < 0:
+        raise ValueError('maxBaseRoll must be a finite nonnegative angle')
     return {
         'reference_height': height,
+        'maximum_roll': max_roll,
+        'orientation_topic': parameters.get('target', {}).get(
+            'baseOrientationTopic', '/humanoid/base_orientation_command'),
         'minimum_height': minimum,
         'maximum_height': maximum,
         'posture_controller': '/' + controller_name if posture else '',

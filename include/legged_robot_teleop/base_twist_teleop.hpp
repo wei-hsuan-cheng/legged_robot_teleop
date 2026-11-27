@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include <geometry_msgs/msg/vector3.hpp>
 #include <ocs2_msgs/msg/walking_velocity_command.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joy.hpp>
@@ -63,6 +64,7 @@ private:
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr posture_client_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr motion_state_subscription_;
   rclcpp::Publisher<ocs2_msgs::msg::WalkingVelocityCommand>::SharedPtr publisher_;
+  rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr orientation_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::Joy>::SharedPtr joy_publisher_;
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_publisher_;
