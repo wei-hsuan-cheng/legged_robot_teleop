@@ -198,3 +198,15 @@ Final verification: all 68 teleop checks pass, including the shipped-mapping reg
 Upkie settled at base pitch -0.1967/+0.1958 rad for command-frame +0.2/-0.2 and height 0.26485 m for a 0.26500 m target.
 Suggested commit message: `feat: map D-pad to body tilt and add thresholded stick height control`.
 
+## Pineapple Variants (2026-11-28)
+
+OCS2 now names the arm-free robot `pineapple` and the original arm-equipped robot `pineapple_manipulator`.
+The launch choices accept both names and the existing profile reads each matching controller YAML; no teleop logic, mapping, numeric defaults or FSM changed.
+The Release build passed and all 68 teleop checks passed in `ros_jazzy`.
+Synthetic Joy through this package passed a stand/short-drive/sit cycle for `pineapple_manipulator` and stand-up plus eight seconds of MPC balance for the untuned arm-free `pineapple`.
+The user asked to stop arm-free testing there and leave further testing/tuning to them first.
+Full model details, measurements and artifacts are recorded in the OCS2 repo's `docs/pineapple.md` and `docs/wheeled_biped_handoff.md`.
+TurboMPC and physical gamepad transport were not tested for this split.
+Do not commit or push this task's changes until the user requests it.
+The user subsequently requested pushing this checkpoint on `main` in both repositories; this supersedes the earlier hold.
+

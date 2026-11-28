@@ -110,7 +110,7 @@ See the [upstream driver documentation](https://github.com/ros-drivers/joystick_
 
 | Argument | Default / Purpose |
 | --- | --- |
-| `robot_name` | `g1`; also `h2`, `upkie`, `pineapple` |
+| `robot_name` | `g1`; also `h2`, `upkie`, `pineapple` (no arm), `pineapple_manipulator` (arm stowed) |
 | `controllers_file` | Empty: use installed MPC `config/<robot>/ros2_controllers.yaml` |
 | `mpc_controller_name` | `humanoid_whole_body_inverse_dynamics_mpc_controller`; YAML key |
 | `ref_base_height` | Empty: read nominal height from controller YAML |

@@ -63,7 +63,8 @@ def generate_launch_description():
     share = Path(get_package_share_directory('legged_robot_teleop'))
     return LaunchDescription([
         DeclareLaunchArgument(
-            'robot_name', default_value='g1', choices=['g1', 'h2', 'upkie', 'pineapple'],
+            'robot_name', default_value='g1',
+            choices=['g1', 'h2', 'upkie', 'pineapple', 'pineapple_manipulator'],
             description='Robot profile; reads heights from its controller YAML.',
         ),
         DeclareLaunchArgument('controllers_file', default_value=''),
