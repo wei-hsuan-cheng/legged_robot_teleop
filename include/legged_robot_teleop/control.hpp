@@ -16,20 +16,20 @@ struct Settings
   int axis_forward = 1;
   int axis_lateral = 0;
   int axis_yaw = 2;
-  int axis_pitch = 3;
+  int axis_height = 3;
   int axis_enable = 4;
   double sign_forward = 1.0;
   double sign_lateral = 1.0;
   double sign_yaw = 1.0;
-  double sign_pitch = 1.0;
+  double sign_height = 1.0;
   double sign_enable = -1.0;
   double scale_forward = 0.25;
   double scale_lateral = 0.25;
   double scale_yaw = 0.25;
   double enable_threshold = 0.5;
   double release_threshold = 0.2;
-  int button_height_up = 11;
-  int button_height_down = 12;
+  int button_pitch_forward = 11;
+  int button_pitch_backward = 12;
   int button_center = 9;
   int button_roll_left = 13;
   int button_roll_right = 14;
@@ -37,10 +37,11 @@ struct Settings
   double minimum_height = 0.2;
   double maximum_height = 1.0;
   double height_rate = 0.05;
+  double height_axis_threshold = 0.3;  // Fraction of stick travel ignored before height changes.
   double maximum_roll = 0.0;  // [rad]; 0 disables the roll buttons (the robot has no commanded roll).
   double roll_rate = 0.3;  // [rad/s]
-  double maximum_pitch = 0.0;  // [rad]; 0 ignores the pitch axis.
-  double pitch_rate = 0.3;  // [rad/s] at full stick deflection
+  double maximum_pitch = 0.0;  // [rad]; 0 ignores the pitch buttons.
+  double pitch_rate = 0.3;  // [rad/s]
   double neutral_threshold = 0.1;
   double stick_exponent = 1.0;  // sign(x)|x|^e on the motion axes; 1 is linear.
   double publish_rate = 50.0;
@@ -107,7 +108,7 @@ private:
   std::optional<double> last_input_;
   std::optional<double> last_tick_;
   std::array<double, 4> axes_{0.0, 0.0, 0.0, 0.0};
-  std::array<bool, 4> buttons_{false, false, false, false};  // height up/down, roll left/right
+  std::array<bool, 4> buttons_{false, false, false, false};  // pitch forward/back, roll left/right
   bool center_pressed_ = false;
 };
 

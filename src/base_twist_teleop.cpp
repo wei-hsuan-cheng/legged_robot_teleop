@@ -91,20 +91,20 @@ BaseTwistTeleop::BaseTwistTeleop(const rclcpp::NodeOptions & options)
   integer("axis_forward", s.axis_forward);
   integer("axis_lateral", s.axis_lateral);
   integer("axis_yaw", s.axis_yaw);
-  integer("axis_pitch", s.axis_pitch);
+  integer("axis_height", s.axis_height);
   integer("axis_enable", s.axis_enable);
   real("sign_forward", s.sign_forward);
   real("sign_lateral", s.sign_lateral);
   real("sign_yaw", s.sign_yaw);
-  real("sign_pitch", s.sign_pitch);
+  real("sign_height", s.sign_height);
   real("sign_enable", s.sign_enable);
   real("scale_forward", s.scale_forward);
   real("scale_lateral", s.scale_lateral);
   real("scale_yaw", s.scale_yaw);
   real("enable_threshold", s.enable_threshold);
   real("release_threshold", s.release_threshold);
-  integer("button_height_up", s.button_height_up);
-  integer("button_height_down", s.button_height_down);
+  integer("button_pitch_forward", s.button_pitch_forward);
+  integer("button_pitch_backward", s.button_pitch_backward);
   integer("button_center", s.button_center);
   integer("button_roll_left", s.button_roll_left);
   integer("button_roll_right", s.button_roll_right);
@@ -112,6 +112,7 @@ BaseTwistTeleop::BaseTwistTeleop(const rclcpp::NodeOptions & options)
   real("minimum_height", s.minimum_height);
   real("maximum_height", s.maximum_height);
   real("height_rate", s.height_rate);
+  real("height_axis_threshold", s.height_axis_threshold);
   real("maximum_roll", s.maximum_roll);
   real("roll_rate", s.roll_rate);
   real("maximum_pitch", s.maximum_pitch);
@@ -199,7 +200,10 @@ void BaseTwistTeleop::receivePostureButton(const sensor_msgs::msg::Joy & message
   const auto button = [&](int i) {
       return i >= 0 && i < static_cast<int>(message.buttons.size()) && message.buttons[i] != 0;
     };
-  if (button(s.button_center) || button(s.button_height_up) || button(s.button_height_down)) {
+  if (button(s.button_center) ||
+    (s.maximum_pitch > 0.0 && (button(s.button_pitch_forward) || button(s.button_pitch_backward))) ||
+    (s.maximum_roll > 0.0 && (button(s.button_roll_left) || button(s.button_roll_right))))
+  {
     return;
   }
   for (const int i : {s.axis_forward, s.axis_lateral, s.axis_yaw}) {
@@ -207,7 +211,7 @@ void BaseTwistTeleop::receivePostureButton(const sensor_msgs::msg::Joy & message
       return;
     }
   }
-  if (s.maximum_pitch > 0.0 && std::abs(message.axes[s.axis_pitch]) > s.neutral_threshold) {
+  if (s.axis_height >= 0 && std::abs(message.axes[s.axis_height]) > s.height_axis_threshold) {
     return;
   }
   if (motion_state_ != "idle" && motion_state_ != "locomotion") {

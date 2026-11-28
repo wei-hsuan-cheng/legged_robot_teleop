@@ -38,9 +38,9 @@ Sample sample(
   return {axes, buttons};
 }
 
-std::vector<double> stick(double forward, double lateral = 0.0, double yaw = 0.0)
+std::vector<double> stick(double forward, double lateral = 0.0, double yaw = 0.0, double height = 0.0)
 {
-  return {lateral, forward, yaw, 0.0, 0.0, 0.0};
+  return {lateral, forward, yaw, height, 0.0, 0.0};
 }
 
 void receive(TeleopControl & control, const Sample & s, double now)
@@ -108,7 +108,7 @@ TEST(Control, ReleaseZeroesVelocitiesPreservingHeight)
 {
   TeleopControl control{Settings{}};
   arm(control);
-  receive(control, sample({11}, stick(0), 1.0), 0.02);
+  receive(control, sample({}, stick(0, 0, 0, 1), 1.0), 0.02);
   const double height = control.command(0.04).height;
   receive(control, sample(), 0.05);
   const Command command = control.command(0.06);
@@ -191,12 +191,12 @@ TEST(Control, HeightLimitsAndCenter)
     })};
   arm(control);
   for (int i = 1; i < 50; ++i) {
-    receive(control, sample({11}, stick(0), 1.0), 0.02 * i);
+    receive(control, sample({}, stick(0, 0, 0, 1), 1.0), 0.02 * i);
     control.command(0.02 * i);
   }
   EXPECT_EQ(control.height(), 0.33);
   for (int i = 50; i < 100; ++i) {
-    receive(control, sample({12}, stick(0), 1.0), 0.02 * i);
+    receive(control, sample({}, stick(0, 0, 0, -1), 1.0), 0.02 * i);
     control.command(0.02 * i);
   }
   EXPECT_EQ(control.height(), 0.2);
@@ -254,24 +254,22 @@ TEST(Control, PitchLimitsHoldCenterAndReset)
       s.maximum_pitch = 0.2; s.pitch_rate = 0.5; s.stick_exponent = 2.0;
     })};
   arm(control);
-  auto input = sample({}, stick(0), 1.0);
-  input.axes[3] = 0.5;
+  auto input = sample({11}, stick(0), 1.0);
   receive(control, input, 0.02);
-  EXPECT_NEAR(control.command(0.03).pitch, 0.0025, 1e-12);
-  input.axes[3] = 1.0;
+  EXPECT_NEAR(control.command(0.03).pitch, 0.01, 1e-12);
   for (int i = 2; i < 60; ++i) {
     receive(control, input, 0.02 * i);
     control.command(0.02 * i);
   }
   EXPECT_DOUBLE_EQ(control.pitch(), 0.2);
   receive(control, sample({}, stick(0), 1.0), 1.2);
-  EXPECT_DOUBLE_EQ(control.command(1.22).pitch, 0.2) << "Neutral stick holds pitch";
+  EXPECT_DOUBLE_EQ(control.command(1.22).pitch, 0.2) << "Released D-pad holds pitch";
   receive(control, sample(), 1.23);
   EXPECT_DOUBLE_EQ(control.command(1.24).pitch, 0.2) << "Released L2 holds pitch";
   receive(control, sample({9}), 1.25);
   EXPECT_DOUBLE_EQ(control.command(1.26).pitch, 0.0);
   arm(control, 1.27);
-  input.axes[3] = -1.0;
+  input = sample({12}, stick(0), 1.0);
   for (int i = 1; i < 60; ++i) {
     receive(control, input, 1.3 + 0.02 * i);
     control.command(1.3 + 0.02 * i);
@@ -283,48 +281,102 @@ TEST(Control, PitchLimitsHoldCenterAndReset)
   EXPECT_DOUBLE_EQ(control.pitch(), 0.0);
 }
 
-TEST(EnableFsm, PitchMustBeCenteredToArmOnlyWhenEnabled)
+TEST(EnableFsm, PitchButtonsMustBeReleasedToArmOnlyWhenEnabled)
 {
   for (const double limit : {0.0, 0.2}) {
     TeleopControl control{with([&](Settings & s) {s.maximum_pitch = limit;})};
     receive(control, sample(), 0.0);
-    auto input = sample({}, stick(0), 1.0);
-    input.axes[3] = 0.4;
+    auto input = sample({11}, stick(0), 1.0);
     receive(control, input, 0.01);
     EXPECT_EQ(control.enabled(), limit == 0.0);
     if (limit > 0.0) {
-      EXPECT_EQ(control.state(), "enable_blocked_sticks_not_centered");
+      EXPECT_EQ(control.state(), "enable_blocked_pitch_buttons_held");
       arm(control, 0.02);
     }
   }
 }
 
-TEST(Control, PitchAxisRequiredOnlyWithPitchEnabled)
+TEST(Control, TiltButtonsRequiredOnlyWhenEnabled)
 {
-  TeleopControl disabled{with([](Settings & s) {s.axis_pitch = 20;})};
+  TeleopControl disabled{with([](Settings & s) {
+      s.button_pitch_forward = 20; s.button_roll_left = 21;
+    })};
   arm(disabled);
   EXPECT_DOUBLE_EQ(disabled.command(0.02).pitch, 0.0);
-  TeleopControl enabled{with([](Settings & s) {s.axis_pitch = 20; s.maximum_pitch = 0.2;})};
+  TeleopControl enabled{with([](Settings & s) {s.button_pitch_forward = 20; s.maximum_pitch = 0.2;})};
   receive(enabled, sample(), 0.0);
   EXPECT_EQ(enabled.state(), "invalid_input");
 }
 
-TEST(Control, BothHeightButtonsCancelAndDisabledHeightIsIgnored)
+TEST(Control, BothPitchButtonsCancelAndNeverChangeHeight)
 {
-  TeleopControl control{Settings{}};
+  TeleopControl control{with([](Settings & s) {s.maximum_pitch = 0.2;})};
   receive(control, sample({11}), 0.0);
   EXPECT_EQ(control.command(0.02).height, 0.6);
   arm(control, 0.03);
   receive(control, sample({11, 12}, stick(0), 1.0), 0.05);
   EXPECT_EQ(control.command(0.06).height, 0.6);
+  EXPECT_DOUBLE_EQ(control.pitch(), 0.0);
 }
 
 TEST(Control, HeightDoesNotJumpAfterADelayedCallback)
 {
   TeleopControl control{Settings{}};
   arm(control);
-  receive(control, sample({11}, stick(0), 1.0), 0.2);
-  EXPECT_LE(control.command(0.21).height - 0.6, 0.05 * 0.04 + 1e-12);
+  receive(control, sample({}, stick(0, 0, 0, 1), 1.0), 0.2);
+  EXPECT_NEAR(control.command(0.21).height - 0.6, 0.05 * 0.04, 1e-12);
+}
+
+TEST(Control, HeightDeadbandAndContinuousProportionalRate)
+{
+  TeleopControl control{with([](Settings & s) {s.height_rate = 0.2;})};
+  arm(control);
+  double now = 0.02;
+  for (const double height : {0.0, 0.1, -0.1, 0.3, -0.3}) {
+    receive(control, sample({}, stick(0, 0, 0, height), 1.0), now);
+    EXPECT_DOUBLE_EQ(control.command(now).height, 0.6);
+    now += 0.02;
+  }
+  // Halfway from the 30% deadband to full stick gives half the maximum height rate.
+  receive(control, sample({}, stick(0, 0, 0, 0.65), 1.0), now);
+  EXPECT_NEAR(control.command(now).height, 0.6 + 0.5 * 0.2 * 0.02, 1e-12);
+  now += 0.02;
+  receive(control, sample({}, stick(0, 0, 0, -0.65), 1.0), now);
+  EXPECT_NEAR(control.command(now).height, 0.6, 1e-12);
+  EXPECT_DOUBLE_EQ(control.roll(), 0.0);
+  EXPECT_DOUBLE_EQ(control.pitch(), 0.0);
+}
+
+TEST(EnableFsm, HeightDeadbandAlsoGuardsArming)
+{
+  TeleopControl control{Settings{}};
+  receive(control, sample(), 0.0);
+  receive(control, sample({}, stick(0, 0, 0, 0.31), 1.0), 0.01);
+  EXPECT_EQ(control.state(), "enable_blocked_sticks_not_centered");
+  EXPECT_FALSE(control.enabled());
+  receive(control, sample(), 0.02);
+  receive(control, sample({}, stick(0, 0, 0, 0.3), 1.0), 0.03);
+  EXPECT_TRUE(control.enabled());
+  EXPECT_DOUBLE_EQ(control.command(0.04).height, 0.6);
+}
+
+TEST(Control, HeightAxisCanBeDisabledAndMissingEnabledAxisDisarms)
+{
+  TeleopControl disabled{with([](Settings & s) {s.axis_height = -1;})};
+  arm(disabled);
+  receive(disabled, sample({}, stick(0, 0, 0, 1), 1.0), 0.02);
+  EXPECT_DOUBLE_EQ(disabled.command(0.03).height, 0.6);
+  TeleopControl enabled{with([](Settings & s) {s.axis_height = 20;})};
+  receive(enabled, sample(), 0.0);
+  EXPECT_EQ(enabled.state(), "invalid_input");
+}
+
+TEST(Control, HeightAxisSignCanBeReversed)
+{
+  TeleopControl control{with([](Settings & s) {s.sign_height = -1.0;})};
+  arm(control);
+  receive(control, sample({}, stick(0, 0, 0, 1), 1.0), 0.02);
+  EXPECT_LT(control.command(0.03).height, control.settings().reference_height);
 }
 
 TEST(Control, UpkieIgnoresLateralAxisAndOptionalButtonsCanBeDisabled)
@@ -363,10 +415,12 @@ TEST(Control, InvalidSettingsFailFast)
     [](Settings & s) {s.maximum_pitch = -0.1;},
     [](Settings & s) {s.maximum_pitch = std::numeric_limits<double>::quiet_NaN();},
     [](Settings & s) {s.pitch_rate = 0.0;},
-    [](Settings & s) {s.sign_pitch = 0.0;},
-    [](Settings & s) {s.maximum_pitch = 0.2; s.axis_pitch = s.axis_enable;},
-    [](Settings & s) {s.maximum_pitch = 0.2; s.axis_pitch = s.axis_yaw;},
-    [](Settings & s) {s.maximum_pitch = 0.2; s.axis_pitch = -1;},
+    [](Settings & s) {s.sign_height = 0.0;},
+    [](Settings & s) {s.axis_height = s.axis_enable;},
+    [](Settings & s) {s.axis_height = s.axis_yaw;},
+    [](Settings & s) {s.height_axis_threshold = -0.1;},
+    [](Settings & s) {s.height_axis_threshold = 1.0;},
+    [](Settings & s) {s.height_axis_threshold = std::numeric_limits<double>::quiet_NaN();},
   };
   for (std::size_t i = 0; i < changes.size(); ++i) {
     EXPECT_THROW(TeleopControl{with(changes[i])}, std::invalid_argument) << "case " << i;
@@ -411,7 +465,7 @@ TEST(Control, CenterIsIgnoredWhileEnabledAndNotQueuedUntilRelease)
 {
   TeleopControl control{Settings{}};
   arm(control);
-  receive(control, sample({11}, stick(0), 1.0), 0.02);
+  receive(control, sample({}, stick(0, 0, 0, 1), 1.0), 0.02);
   const double height = control.command(0.04).height;
   EXPECT_GT(height, control.settings().reference_height);
   receive(control, sample({9}, stick(1), 1.0), 0.05);
@@ -442,7 +496,7 @@ TEST(Control, CenterIsIgnoredWithAPartiallyPressedTrigger)
 {
   TeleopControl control{Settings{}};
   arm(control);
-  receive(control, sample({11}, stick(0), 1.0), 0.02);
+  receive(control, sample({}, stick(0, 0, 0, 1), 1.0), 0.02);
   const double height = control.command(0.04).height;
   receive(control, sample(), 0.05);
   receive(control, sample({9}, stick(0), 0.3), 0.06);
@@ -455,7 +509,7 @@ TEST(Control, CircleDoesNotBlockCenter)
 {
   TeleopControl control{Settings{}};
   arm(control);
-  receive(control, sample({11}, stick(0), 1.0), 0.02);
+  receive(control, sample({}, stick(0, 0, 0, 1), 1.0), 0.02);
   EXPECT_GT(control.command(0.04).height, control.settings().reference_height);
   receive(control, sample({1, 9}), 0.05);
   EXPECT_EQ(control.state(), "centered");
@@ -510,10 +564,10 @@ TEST(EnableFsm, BlockedPressExplainsReasonAndRequiresRelease)
     double forward;
     const char * reason;
   };
-  for (const Case & c : {Case{{9}, 0.0, "center_held"}, Case{{11}, 0.0, "height_buttons_held"},
+  for (const Case & c : {Case{{9}, 0.0, "center_held"}, Case{{11}, 0.0, "pitch_buttons_held"},
       Case{{}, 0.2, "sticks_not_centered"}})
   {
-    TeleopControl control{Settings{}};
+    TeleopControl control{with([](Settings & s) {s.maximum_pitch = 0.2;})};
     send(control, 0.0);
     send(control, 0.01, 0.6, c.forward, c.buttons);
     EXPECT_EQ(control.enableState(), EnableState::WaitRelease);
@@ -609,11 +663,13 @@ TEST(EnableFsm, RandomizedInputSequencesNeverBypassEnableGuards)
   const double steps[] = {0.001, 0.01, 0.02, 0.3};
   const double pressures[] = {0.0, 0.19, 0.2, 0.21, 0.49, 0.5, 0.8, 1.0};
   const double forwards[] = {0.0, 0.05, 0.3, 1.0, -1.0};
-  const std::vector<std::vector<int>> button_sets{{}, {9}, {1}, {11}, {12}, {1, 9}, {11, 12}};
+  const double heights[] = {0.0, 0.2, 0.3, 0.4, -0.8, 1.0};
+  const std::vector<std::vector<int>> button_sets{
+    {}, {9}, {1}, {11}, {12}, {1, 9}, {11, 12}, {13}, {14}, {11, 14}};
   for (unsigned seed = 0; seed < 6; ++seed) {
     std::mt19937 rng(seed);
     const auto pick = [&](std::size_t n) {return std::uniform_int_distribution<std::size_t>(0, n - 1)(rng);};
-    TeleopControl control{Settings{}};
+    TeleopControl control{with([](Settings & s) {s.maximum_pitch = 0.2; s.maximum_roll = 0.25;})};
     const Settings & s = control.settings();
     double now = 0.0;
     for (int k = 0; k < 1000; ++k) {
@@ -621,8 +677,9 @@ TEST(EnableFsm, RandomizedInputSequencesNeverBypassEnableGuards)
       const EnableState previous = control.enableState();
       const double pressure = pressures[pick(8)];
       const double forward = forwards[pick(5)];
+      const double height = heights[pick(6)];
       const std::vector<int> & buttons = button_sets[pick(button_sets.size())];
-      Sample snapshot = sample({}, stick(forward), pressure);
+      Sample snapshot = sample({}, stick(forward, 0, 0, height), pressure);
       for (const int b : buttons) {
         snapshot.buttons[b] = 1;
       }
@@ -640,6 +697,8 @@ TEST(EnableFsm, RandomizedInputSequencesNeverBypassEnableGuards)
       ASSERT_TRUE(std::isfinite(command.forward) && std::isfinite(command.lateral) &&
         std::isfinite(command.yaw) && std::isfinite(command.height));
       ASSERT_LE(std::abs(command.forward), s.scale_forward);
+      ASSERT_LE(std::abs(command.roll), s.maximum_roll);
+      ASSERT_LE(std::abs(command.pitch), s.maximum_pitch);
       if (!control.enabled()) {
         ASSERT_TRUE(zeroVelocity(command));
       }
@@ -650,7 +709,8 @@ TEST(EnableFsm, RandomizedInputSequencesNeverBypassEnableGuards)
         ASSERT_EQ(previous, EnableState::Ready);
         ASSERT_GE(pressure, s.enable_threshold);
         ASSERT_LE(std::abs(forward), s.neutral_threshold);
-        ASSERT_FALSE(has(9) || has(11) || has(12));
+        ASSERT_LE(std::abs(height), s.height_axis_threshold);
+        ASSERT_FALSE(has(9) || has(11) || has(12) || has(13) || has(14));
       }
     }
   }

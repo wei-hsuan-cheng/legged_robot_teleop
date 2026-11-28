@@ -84,7 +84,9 @@ ros2 topic echo /teleop/test/walking_velocity_command \
 Release L2, center sticks, then hold L2 and move them.
 Enable occurs at 50% of the ROS trigger range; release to 20% or below to disable and re-arm.
 With the current launch YAML, full forward produces `linear_velocity_x: 1.0`; full left produces `linear_velocity_y: 1.0`; right stick left produces positive yaw.
-H2 starts at the nominal height from its installed YAML; D-pad changes it only while L2 is held.
+H2 starts at the nominal height from its installed YAML; right stick forward/back changes it only while L2 is held.
+Check that height holds within the first 30% of vertical stick travel, rises with larger forward deflection and lowers with backward deflection.
+Upkie/Pineapple use D-pad left/right for roll and up/down for pitch; the buttons must not change height.
 Release L2 and check zero velocity/yaw with unchanged height.
 With L2 released, press L1 to Center: zero velocity/yaw and restore nominal height.
 Press L1 while driving and check that it does not reset height or interrupt motion.

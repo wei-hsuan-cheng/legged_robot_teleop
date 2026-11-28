@@ -36,14 +36,14 @@ See [connection and testing](docs/testing.md) for USB, Docker, isolated topic ch
 | L2 held | Enable motion after releasing L2 and centering both sticks |
 | Left stick | Forward/backward and left/right |
 | Right stick horizontal | Yaw rate |
-| Right stick forward/back, with L2 | Upkie, Pineapple: increase/decrease trunk pitch, up to `maxBasePitch`; centered stick or released L2 holds the tilt |
-| D-pad up/down, with L2 | Increase/decrease base height |
+| Right stick forward/back, with L2 | Increase/decrease base height; ignores the first 30% of stick travel |
+| D-pad up/down, with L2 | Upkie, Pineapple: lean forward/back (pitch), up to `maxBasePitch`; holds when released |
 | D-pad left/right, with L2 | Upkie, Pineapple: lean the trunk left/right (roll), up to the robot's `maxBaseRoll`; held when L2 is released |
 | L1, with L2 released | Center: zero velocity/yaw, restore nominal base height and level the trunk |
 | Square, with L2 released | Upkie, Pineapple: toggle Stand Up / Sit Down, with centered sticks |
 | Circle, in locomotion | Upkie, Pineapple: cycle the gait walk -> trot -> wheel_drive (the velocity ladder) |
 | Triangle held, in locomotion | Upkie, Pineapple: jump while held, then back to the Circle selection |
-| Release L2 or lose input | Zero velocity/yaw, keep the selected height |
+| Release L2 | Zero velocity/yaw, keep the selected height and tilt |
 
 The launch YAML currently uses 100% of the MPC's configured maximum speeds; start with small stick deflections.
 Lower the fractions in `config/dualsense.yaml` for slower joystick control without changing MPC tuning.
@@ -63,10 +63,11 @@ After stand-up, release and press L2 again to enable motion.
 Posture control is enabled automatically only when the selected controller YAML defines a planned stand-up; G1/H2 have no new posture-button behavior.
 There is no input timeout, as in `dric_joystick`: the last `/joy` sample holds until the next one, and releasing L2 stops motion. If the gamepad link drops while L2 is held, the last command keeps being published and the MPC keeps following it; stop the robot by other means (e.g. reconnect and release L2, or the controller/E-stop).
 
-Stick deflection is shaped as sign(x)|x|^`stick_exponent` (2 in `dualsense.yaml`) for fine low-speed control; full deflection still commands the full scaled speed.
+Velocity-stick deflection is shaped as sign(x)|x|^`stick_exponent` (2 in `dualsense.yaml`) for fine low-speed control; full deflection still commands the full scaled speed.
+Height uses its own `height_axis_threshold` (0.3): within the deadband it holds; above it the rate grows linearly from zero to `height_rate` (0.2 m/s in `dualsense.yaml`).
 L2 is axis 4, reported by `game_controller_node` as 0 released to -1 fully pressed.
 The deadman engages at 50% of that ROS range and releases at 20%, avoiding threshold chatter.
-Centered sticks and released Center/height buttons are required at the instant of enabling.
+Centered velocity sticks, the height stick inside its deadband, and released Center/active tilt buttons are required at the instant of enabling.
 Center requires L2 at or below its release threshold and a fresh L1 press.
 L1 presses during driving or partial trigger presses are ignored, not queued for later.
 Release L1 before re-enabling L2.
@@ -115,7 +116,9 @@ See the [upstream driver documentation](https://github.com/ros-drivers/joystick_
 | `ref_base_height` | Empty: read nominal height from controller YAML |
 | `maximum_roll`, `maximum_pitch`, `orientation_topic` | From the controller YAML (`ocs2.reference.maxBaseRoll`, `maxBasePitch`, `target.baseOrientationTopic`); 0 disables that tilt axis |
 | `button_roll_left`, `button_roll_right`, `roll_rate` | D-pad left 13, right 14 (SDL), 0.3 rad/s |
-| `axis_pitch`, `sign_pitch`, `pitch_rate` | Right stick vertical 3 (SDL), +1, 0.3 rad/s at full stick; uses the same stick response curve as velocity |
+| `button_pitch_forward`, `button_pitch_backward`, `pitch_rate` | D-pad up 11, down 12 (SDL), 0.3 rad/s |
+| `axis_height`, `sign_height`, `height_axis_threshold` | Right stick vertical 3 (SDL), +1, deadband 0.3 |
+| `height_rate` | Maximum height change rate, 0.2 m/s at full stick in `dualsense.yaml` |
 | `params_file` | Installed `config/dualsense.yaml` |
 | `device_name` | `DualSense Wireless Controller`; takes precedence over `device_id` |
 | `device_id` | `0`; clear `device_name` to select by ID |
@@ -127,16 +130,16 @@ See the [upstream driver documentation](https://github.com/ros-drivers/joystick_
 Output velocities are normalized fractions within `[-1, 1]`, not physical m/s or rad/s.
 `desired_pelvis_height` is an absolute height in meters, matching the GUI contract.
 For robots with a roll or pitch limit the node also publishes `geometry_msgs/Vector3` on `orientation_topic` (x roll [rad], positive leans right; y pitch [rad], positive leans forward in the command frame) at the same rate.
-The stick controls pitch rate, not absolute pitch: center the stick to hold the angle, release L2 and press L1 to level both axes.
+The D-pad controls tilt rates, not absolute angles: release the buttons to hold the angle, release L2 and press L1 to level both axes.
 Roll and pitch also level when the robot leaves locomotion.
-The pitch stick must be centered before enabling L2 or toggling stand/sit; robots with `maxBasePitch: 0` ignore it.
+The height stick must be inside its deadband and active tilt buttons released before enabling L2 or toggling stand/sit; robots with `maxBasePitch: 0` ignore the pitch buttons.
 How the controller turns it into leg lengths, with results and sources: legged_robot_mpc_controller `docs/base_orientation_control.md`.
 The bundled driver uses `<joy_topic>/raw`; the adapter subscribes with best effort and exposes the unchanged joystick data on public `joy_topic` with best effort, volatile, depth 1.
 Commands and `~/status` diagnostics also use best effort, volatile, depth 1.
 With `start_joy:=false`, the adapter directly consumes the external topic using best effort; that external publisher's QoS is not changed.
 Only one base-command source may publish at once; disable the GUI and scripted targets before using teleop.
 Axis/button mapping and safety parameters are read-only after startup; restart to apply a new mapping.
-Optional motion-axis and height-button indices can be `-1` to disable them; the enable axis and stop button are always required.
+Optional velocity/height-axis and tilt-button indices can be `-1` to disable them; the enable axis is always required.
 
 
 ## Tests
@@ -147,7 +150,8 @@ colcon test-result --verbose
 ```
 
 C++ unit tests (gtest, `test/test_control.cpp`) cover signs/scaling, height bounds, release/stop, malformed input, held commands without new input, the stick response curve, the D-pad roll (limits, hold on release, Center, ignored without a roll limit), and the enable FSM: post-Center re-enabling, trigger hysteresis, blocked-input recovery, clock faults, and 6,000 deterministic randomized input steps.
-Pitch tests cover both limits, response shaping, hold on release, L1/reset, optional axis validation and neutral-stick arming; a DDS test checks pitch-only output, best-effort QoS and leveling outside locomotion.
+Pitch tests cover both limits, opposing buttons, hold on release, L1/reset and optional button validation; height tests cover the deadband boundary, proportional rates, limits, direction, disabled/missing axes and arming guards.
+A DDS test checks pitch-only output, best-effort QoS and leveling outside locomotion.
 The ROS-level pytest tests start the built `base_twist` executable and observe it only through topics, `~/status` and the ROS graph.
 Isolated service tests cover Square edges, configurable mapping, blocked presses, transition states, stale robot status and L2 re-arming at handover.
 The ROS transport test uses its own ROS domain and unique test topics, including a paused simulation clock with no `/clock` publisher.

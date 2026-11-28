@@ -23,8 +23,8 @@ void Settings::validate() const
 {
   const std::pair<const char *, int> indices[] = {
     {"axis_forward", axis_forward}, {"axis_lateral", axis_lateral}, {"axis_yaw", axis_yaw},
-    {"axis_enable", axis_enable}, {"axis_pitch", axis_pitch}, {"button_height_up", button_height_up},
-    {"button_height_down", button_height_down}, {"button_center", button_center},
+    {"axis_enable", axis_enable}, {"axis_height", axis_height}, {"button_pitch_forward", button_pitch_forward},
+    {"button_pitch_backward", button_pitch_backward}, {"button_center", button_center},
     {"button_roll_left", button_roll_left}, {"button_roll_right", button_roll_right},
   };
   for (const auto & [name, value] : indices) {
@@ -34,7 +34,7 @@ void Settings::validate() const
     sign_forward, sign_lateral, sign_yaw, sign_enable, scale_forward, scale_lateral, scale_yaw,
     enable_threshold, release_threshold, reference_height, minimum_height, maximum_height,
     height_rate, neutral_threshold, stick_exponent, publish_rate, maximum_roll, roll_rate,
-    sign_pitch, maximum_pitch, pitch_rate,
+    sign_height, height_axis_threshold, maximum_pitch, pitch_rate,
   };
   for (const double value : reals) {
     require(std::isfinite(value), "Settings must be finite");
@@ -43,17 +43,17 @@ void Settings::validate() const
   require(
     axis_enable != axis_forward && axis_enable != axis_lateral && axis_enable != axis_yaw,
     "Enable axis must be separate from motion axes");
-  if (maximum_pitch > 0.0) {
-    require(axis_pitch >= 0 && axis_pitch != axis_enable && axis_pitch != axis_forward &&
-      axis_pitch != axis_lateral && axis_pitch != axis_yaw,
-      "Enabled pitch axis must be separate from the trigger and velocity axes");
+  if (axis_height >= 0) {
+    require(axis_height != axis_enable && axis_height != axis_forward &&
+      axis_height != axis_lateral && axis_height != axis_yaw,
+      "Height axis must be separate from the trigger and velocity axes");
   }
   require(
     0 <= release_threshold && release_threshold < enable_threshold && enable_threshold <= 1,
     "Require 0 <= release_threshold < enable_threshold <= 1");
   std::set<int> buttons;
   int assigned = 0;
-  for (const int button : {button_height_up, button_height_down, button_center, button_roll_left,
+  for (const int button : {button_pitch_forward, button_pitch_backward, button_center, button_roll_left,
       button_roll_right})
   {
     if (button >= 0) {
@@ -62,7 +62,7 @@ void Settings::validate() const
     }
   }
   require(static_cast<int>(buttons.size()) == assigned, "Button assignments must be distinct");
-  for (const double sign : {sign_forward, sign_lateral, sign_yaw, sign_enable, sign_pitch}) {
+  for (const double sign : {sign_forward, sign_lateral, sign_yaw, sign_enable, sign_height}) {
     require(sign == 1.0 || sign == -1.0, "Axis signs must be -1 or 1");
   }
   for (const double scale : {scale_forward, scale_lateral, scale_yaw}) {
@@ -72,6 +72,8 @@ void Settings::validate() const
     0 < minimum_height && minimum_height <= reference_height && reference_height <= maximum_height,
     "Require 0 < minimum_height <= reference_height <= maximum_height");
   require(height_rate > 0, "Height rate must be positive");
+  require(0.0 <= height_axis_threshold && height_axis_threshold < 1.0,
+    "Height axis threshold must be within [0, 1)");
   require(0.0 <= maximum_roll && maximum_roll <= 1.0, "Maximum roll must be within [0, 1] rad");
   require(roll_rate > 0, "Roll rate must be positive");
   require(0.0 <= maximum_pitch && maximum_pitch <= 1.0, "Maximum pitch must be within [0, 1] rad");
@@ -129,9 +131,13 @@ void TeleopControl::receive(
     return;
   }
   const std::array<int, 4> axis_indices{
-    s.axis_forward, s.axis_lateral, s.axis_yaw, s.maximum_pitch > 0.0 ? s.axis_pitch : -1};
-  // The roll buttons need to exist only when the robot takes a roll command.
-  std::vector<int> button_indices{s.button_height_up, s.button_height_down, s.button_center};
+    s.axis_forward, s.axis_lateral, s.axis_yaw, s.axis_height};
+  // Tilt buttons need to exist only when the robot accepts that axis.
+  std::vector<int> button_indices{s.button_center};
+  if (s.maximum_pitch > 0.0) {
+    button_indices.push_back(s.button_pitch_forward);
+    button_indices.push_back(s.button_pitch_backward);
+  }
   if (s.maximum_roll > 0.0) {
     button_indices.push_back(s.button_roll_left);
     button_indices.push_back(s.button_roll_right);
@@ -166,21 +172,23 @@ void TeleopControl::receive(
   last_input_ = now;
   const double pressure = std::clamp(s.sign_enable * axes[s.axis_enable], 0.0, 1.0);
   last_trigger_pressure_ = pressure;
-  // Roll buttons count only when the robot takes a roll command.
+  const bool pitch_enabled = s.maximum_pitch > 0.0;
   const bool roll_enabled = s.maximum_roll > 0.0;
-  const std::array<bool, 4> height_buttons{pressed(s.button_height_up), pressed(s.button_height_down),
+  const std::array<bool, 4> tilt_buttons{
+    pitch_enabled && pressed(s.button_pitch_forward), pitch_enabled && pressed(s.button_pitch_backward),
     roll_enabled && pressed(s.button_roll_left), roll_enabled && pressed(s.button_roll_right)};
-  const std::array<double, 4> scales{s.scale_forward, s.scale_lateral, s.scale_yaw, s.maximum_pitch};
+  const std::array<double, 4> scales{s.scale_forward, s.scale_lateral, s.scale_yaw, 1.0};
   bool sticks_deflected = false;
   for (std::size_t j = 0; j < values.size(); ++j) {
-    sticks_deflected = sticks_deflected || (scales[j] > 0 && std::abs(values[j]) > s.neutral_threshold);
+    const double threshold = j == 3 ? s.height_axis_threshold : s.neutral_threshold;
+    sticks_deflected = sticks_deflected || (scales[j] > 0 && std::abs(values[j]) > threshold);
   }
   std::string blocker;
   if (center_pressed) {
     blocker = "center_held";
-  } else if (height_buttons[0] || height_buttons[1]) {
-    blocker = "height_buttons_held";
-  } else if (height_buttons[2] || height_buttons[3]) {
+  } else if (tilt_buttons[0] || tilt_buttons[1]) {
+    blocker = "pitch_buttons_held";
+  } else if (tilt_buttons[2] || tilt_buttons[3]) {
     blocker = "roll_buttons_held";
   } else if (sticks_deflected) {
     blocker = "sticks_not_centered";
@@ -218,7 +226,7 @@ void TeleopControl::receive(
     last_tick_ = now;
   }
   axes_ = values;
-  buttons_ = height_buttons;
+  buttons_ = tilt_buttons;
   state_ = "enabled";
 }
 
@@ -239,15 +247,19 @@ Command TeleopControl::command(double now)
     return {0.0, 0.0, 0.0, height_, roll_, pitch_};
   }
   // A delayed callback must not cause a large jump in the height target.
-  const int direction = static_cast<int>(buttons_[0]) - static_cast<int>(buttons_[1]);
-  height_ += direction * s.height_rate * std::min(dt, 2.0 / s.publish_rate);
+  // Continuous deadband: no change inside it, proportional rate above it, full rate at full stick.
+  const double height_input = std::copysign(
+    std::max(0.0, std::abs(axes_[3]) - s.height_axis_threshold) / (1.0 - s.height_axis_threshold),
+    axes_[3]) * s.sign_height;
+  height_ += height_input * s.height_rate * std::min(dt, 2.0 / s.publish_rate);
   height_ = std::clamp(height_, s.minimum_height, s.maximum_height);
   // D-pad right leans the trunk right (positive roll about the forward axis), left leans it left.
   const int roll_direction = static_cast<int>(buttons_[3]) - static_cast<int>(buttons_[2]);
   roll_ += roll_direction * s.roll_rate * std::min(dt, 2.0 / s.publish_rate);
   roll_ = std::clamp(roll_, -s.maximum_roll, s.maximum_roll);
   const auto shape = [&](double a) {return std::copysign(std::pow(std::abs(a), s.stick_exponent), a);};
-  pitch_ += shape(axes_[3]) * s.sign_pitch * s.pitch_rate * std::min(dt, 2.0 / s.publish_rate);
+  const int pitch_direction = static_cast<int>(buttons_[0]) - static_cast<int>(buttons_[1]);
+  pitch_ += pitch_direction * s.pitch_rate * std::min(dt, 2.0 / s.publish_rate);
   pitch_ = std::clamp(pitch_, -s.maximum_pitch, s.maximum_pitch);
   return {
     shape(axes_[0]) * s.sign_forward * s.scale_forward,

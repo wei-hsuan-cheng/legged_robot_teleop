@@ -178,3 +178,23 @@ That repeat passed for both OCS2 robots, including L1 level and sit-down; all ow
 The reproducible simulation harness and results are documented in the OCS2 repository's `docs/base_orientation_control.md` and `tests/base_orientation_test.py`.
 Physical DualSense operation, hardware, stepping with tilt and terrain with tilt remain untested.
 
+## D-pad Tilt and Stick Height Remap (2026-11-28)
+
+This supersedes the right-stick pitch mapping above, at the user's request.
+With L2 enabled, D-pad left/right remains roll, D-pad up/down now ramps pitch forward/back at `pitch_rate`, and right stick vertical (axis 3) raises/lowers height.
+`height_axis_threshold: 0.3` ignores the first 30% of the reported vertical axis; above it, the height rate is `sign_height * sign(a) * (abs(a) - threshold) / (1 - threshold) * height_rate`.
+This is continuous at the threshold, capped at the configured height bounds and full-stick rate, and independent of the velocity stick's exponent.
+The height stick inside that same deadband and released active tilt buttons are required for L2 arming and Square stand/sit; tilt buttons are ignored on robots with zero limits.
+Opposing pitch buttons cancel; releasing tilt buttons holds their target, recentering the height stick holds height, and L2 release holds all three targets while zeroing velocities.
+L1 with L2 released still restores nominal height and level roll/pitch, and leaving locomotion resets orientation.
+The node/config parameter names are now `axis_height`, `sign_height`, `height_axis_threshold`, `button_pitch_forward`, and `button_pitch_backward`; old pitch-axis/height-button names were removed.
+The teleop Release build passes in the OCS2 `ros_jazzy` workspace, and the initial 67 checks passed (unit, DDS, style, profile, posture, gait); a shipped-mapping regression was subsequently added.
+Pineapple's headless OCS2 test passed stand-up, D-pad pitch +-0.2 rad, combined roll/pitch plus 0.1 m/s driving, L1 level, deadband and a 2 cm height rise, then sit-down to idle.
+Pineapple settled at pitch +0.1946/-0.1946 rad, height 0.38068 m for a 0.38000 m target; within-deadband input left the height command unchanged.
+The corresponding OCS2 operator docs, YAML comments and `tests/base_orientation_test.py` use the new mapping; the native MPC model, tuning, GUI and CppAD libraries are unchanged.
+Artifacts: `/tmp/codex_dpad_pineapple*`, `/tmp/codex_dpad_upkie*` and `/tmp/codex_remap_teleop_tests.log` inside `ros_jazzy`.
+TurboMPC was not modified or rebuilt; physical controller operation remains for the user to test after restarting launch.
+Final verification: all 68 teleop checks pass, including the shipped-mapping regression; both OCS2 Upkie and Pineapple simulation runs passed and their processes were stopped.
+Upkie settled at base pitch -0.1967/+0.1958 rad for command-frame +0.2/-0.2 and height 0.26485 m for a 0.26500 m target.
+Suggested commit message: `feat: map D-pad to body tilt and add thresholded stick height control`.
+

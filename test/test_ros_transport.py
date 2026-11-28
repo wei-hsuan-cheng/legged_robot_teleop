@@ -95,7 +95,9 @@ def test_transport_with_no_simulation_clock(bridge, teleop_process):
         assert status.enabled
         pump(0.1, [0.0, 1.0, 0.0, 0.0, 0.0, 0.0], pressure=1.0)
         assert received[-1].linear_velocity_x > 0
-        pump(0.1, [0.0] * 6, pressed=(11,), pressure=1.0)
+        pump(0.1, [0.0, 0.0, 0.0, 0.25, 0.0, 0.0], pressure=1.0)
+        assert received[-1].desired_pelvis_height == 0.6, 'height stick deadband'
+        pump(0.1, [0.0, 0.0, 0.0, 1.0, 0.0, 0.0], pressure=1.0)
         assert received[-1].desired_pelvis_height > 0.6
         pump(0.1, [0.0] * 6, pressure=1.0)
         height = received[-1].desired_pelvis_height
@@ -158,14 +160,16 @@ def test_pitch_only_publishes_orientation_and_levels_outside_locomotion(teleop_p
     executor = SingleThreadedExecutor(context=context)
     executor.add_node(probe)
 
-    def pump(duration, pressure=0.0, pitch=0.0, center=False, state='locomotion'):
+    def pump(duration, pressure=0.0, pitch=0, center=False, state='locomotion'):
         end = time.monotonic() + duration
         next_send = 0.0
         while time.monotonic() < end:
             if time.monotonic() >= next_send:
                 message = Joy()
-                message.axes = [0.0, 0.0, 0.0, pitch, -pressure, 0.0]
+                message.axes = [0.0, 0.0, 0.0, 0.0, -pressure, 0.0]
                 message.buttons = [int(i == 9 and center) for i in range(15)]
+                if pitch:
+                    message.buttons[11 if pitch > 0 else 12] = 1
                 phase.publish(String(data=state))
                 joy.publish(message)
                 next_send = time.monotonic() + 0.02

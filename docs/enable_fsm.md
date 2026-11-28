@@ -18,9 +18,12 @@ There is no release debounce delay; a released L2 immediately clears motion comm
 An unsafe enable attempt consumes that press, so simply centering a stick while L2 remains held cannot unexpectedly start motion.
 Release L2 and retry when the reported blocking input is clear.
 Malformed input and nonfinite/backward receipt or timer time also clear permission. Silent input does not: there is no input timeout.
-All non-enabled states clear cached velocity, pitch-stick and D-pad inputs, preserving the selected height and tilt targets.
-For robots with `maximum_pitch > 0`, the right stick vertical axis must be neutral before arming, just like velocity axes.
-An absent or malformed enabled pitch axis clears permission; with `maximum_pitch: 0` it is not required and does not block arming.
+All non-enabled states clear cached velocity, height-stick and D-pad inputs, preserving the selected height and tilt targets.
+The right stick vertical axis must be inside `height_axis_threshold` (default 0.3) before arming or toggling stand/sit.
+Height stays fixed inside that deadband, so small vertical offsets during yaw do not change height or block enabling.
+Above the threshold, its rate scales continuously to `height_rate` at full stick.
+An absent or malformed configured height axis clears permission; `axis_height: -1` disables height input.
+Pitch/roll D-pad buttons block arming and stand/sit only if that robot has a nonzero limit for the corresponding tilt axis.
 
 
 ## Center Interaction
@@ -53,11 +56,12 @@ The trigger pressure is the last valid input value, not a claim that a disconnec
 | `release_trigger_to_enable` | Release L2, then press it with neutral controls |
 | `enable_blocked_sticks_not_centered` | Release L2, center the sticks, then press L2 again |
 | `enable_blocked_center_held` | Release L2 and L1 before trying again |
-| `enable_blocked_height_buttons_held` | Release L2 and D-pad before trying again |
+| `enable_blocked_pitch_buttons_held` | Release L2 and D-pad up/down before trying again |
+| `enable_blocked_roll_buttons_held` | Release L2 and D-pad left/right before trying again |
 | `invalid_input` | Check driver mapping and message shape |
 | `invalid_time` | Check the receipt/timer time source, then release L2 and retry |
 
-In `ready`, `center_held`, `height_buttons_held`, and `sticks_not_centered` are preparation hints rather than faults.
+In `ready`, `center_held`, `pitch_buttons_held`, `roll_buttons_held`, and `sticks_not_centered` are preparation hints rather than faults.
 `ready` means neutral controls and L2 below the engage threshold; `centered` records an accepted Center edge.
 
 

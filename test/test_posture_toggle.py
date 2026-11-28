@@ -30,6 +30,7 @@ def test_posture_toggle_requires_release_and_safe_fresh_robot_state(
         '-p', 'joy_topic:=' + namespace + '/joy',
         '-p', 'command_topic:=' + namespace + '/command',
         '-p', 'posture_controller:=' + namespace,
+        '-p', 'maximum_pitch:=0.2',
     ]
     if posture_button != 2:
         args += ['-p', 'button_posture:=%d' % posture_button]
@@ -52,14 +53,14 @@ def test_posture_toggle_requires_release_and_safe_fresh_robot_state(
     executor = SingleThreadedExecutor(context=context)
     executor.add_node(probe)
 
-    def pump(pressed=(), pressure=0.0, state='idle', forward=0.0, duration=0.15):
+    def pump(pressed=(), pressure=0.0, state='idle', forward=0.0, duration=0.15, height=0.0):
         end = time.monotonic() + duration
         next_send = 0.0
         while time.monotonic() < end:
             if time.monotonic() >= next_send:
                 state_publisher.publish(String(data=state))
                 message = Joy()
-                message.axes = [0.0, forward, 0.0, 0.0, -pressure, 0.0]
+                message.axes = [0.0, forward, 0.0, height, -pressure, 0.0]
                 message.buttons = [int(i in pressed) for i in range(15)]
                 joy_publisher.publish(message)
                 next_send = time.monotonic() + 0.02
@@ -87,6 +88,9 @@ def test_posture_toggle_requires_release_and_safe_fresh_robot_state(
         pump((posture_button,), pressure=1.0)
         pump((posture_button,), pressure=0.0)
         assert len(calls) == 1, 'A blocked posture button is consumed, not queued'
+        pump(height=0.4)
+        pump((posture_button,), height=0.4)
+        assert len(calls) == 1, 'Height stick outside the deadband must block stand/sit'
         for buttons, forward, state in (
                 ((posture_button, 9), 0.0, 'idle'),
                 ((posture_button, 11), 0.0, 'idle'), ((posture_button,), 1.0, 'idle'),
@@ -128,3 +132,19 @@ def test_shipped_posture_mapping_is_square():
     )
     assert config['base_twist_teleop']['ros__parameters']['button_posture'] == 2
     assert 'button_stop' not in config['base_twist_teleop']['ros__parameters']
+
+
+def test_shipped_body_controls_use_dpad_tilt_and_thresholded_stick_height():
+    """Keep body tilt and height bindings distinct in the installed configuration."""
+    from pathlib import Path
+    import yaml
+
+    parameters = yaml.safe_load(
+        (Path(__file__).parents[1] / 'config/dualsense.yaml').read_text(),
+    )['base_twist_teleop']['ros__parameters']
+    assert (parameters['button_pitch_forward'], parameters['button_pitch_backward']) == (11, 12)
+    assert (parameters['button_roll_left'], parameters['button_roll_right']) == (13, 14)
+    assert parameters['axis_height'] == 3
+    assert parameters['height_axis_threshold'] == 0.3
+    assert 'axis_pitch' not in parameters
+    assert 'button_height_up' not in parameters
