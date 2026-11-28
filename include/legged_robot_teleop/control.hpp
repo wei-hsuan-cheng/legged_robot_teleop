@@ -16,10 +16,12 @@ struct Settings
   int axis_forward = 1;
   int axis_lateral = 0;
   int axis_yaw = 2;
+  int axis_pitch = 3;
   int axis_enable = 4;
   double sign_forward = 1.0;
   double sign_lateral = 1.0;
   double sign_yaw = 1.0;
+  double sign_pitch = 1.0;
   double sign_enable = -1.0;
   double scale_forward = 0.25;
   double scale_lateral = 0.25;
@@ -37,6 +39,8 @@ struct Settings
   double height_rate = 0.05;
   double maximum_roll = 0.0;  // [rad]; 0 disables the roll buttons (the robot has no commanded roll).
   double roll_rate = 0.3;  // [rad/s]
+  double maximum_pitch = 0.0;  // [rad]; 0 ignores the pitch axis.
+  double pitch_rate = 0.3;  // [rad/s] at full stick deflection
   double neutral_threshold = 0.1;
   double stick_exponent = 1.0;  // sign(x)|x|^e on the motion axes; 1 is linear.
   double publish_rate = 50.0;
@@ -45,7 +49,7 @@ struct Settings
   void validate() const;
 };
 
-/// Normalized velocities, absolute base height in meters and trunk roll in radians (positive leans right).
+/// Normalized velocities, absolute base height in meters and trunk roll/pitch in radians.
 struct Command
 {
   double forward;
@@ -53,6 +57,7 @@ struct Command
   double yaw;
   double height;
   double roll;
+  double pitch;
 };
 
 /// Single source of truth for trigger permission, separate from status reasons.
@@ -74,9 +79,10 @@ public:
   const std::string & state() const {return state_;}
   double height() const {return height_;}
   double roll() const {return roll_;}
+  double pitch() const {return pitch_;}
 
   /// Level the trunk (e.g. while the robot is not in locomotion); the height is kept.
-  void resetRoll() {roll_ = 0.0;}
+  void resetOrientation() {roll_ = 0.0; pitch_ = 0.0;}
   double lastTriggerPressure() const {return last_trigger_pressure_;}
 
   /// Clear permission to move without changing the selected height.
@@ -94,12 +100,13 @@ private:
   Settings settings_;
   double height_;
   double roll_ = 0.0;
+  double pitch_ = 0.0;
   std::string state_ = "waiting_for_input";
   EnableState enable_state_ = EnableState::WaitRelease;
   double last_trigger_pressure_ = 0.0;
   std::optional<double> last_input_;
   std::optional<double> last_tick_;
-  std::array<double, 3> axes_{0.0, 0.0, 0.0};
+  std::array<double, 4> axes_{0.0, 0.0, 0.0, 0.0};
   std::array<bool, 4> buttons_{false, false, false, false};  // height up/down, roll left/right
   bool center_pressed_ = false;
 };

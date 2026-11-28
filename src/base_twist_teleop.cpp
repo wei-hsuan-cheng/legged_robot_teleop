@@ -91,10 +91,12 @@ BaseTwistTeleop::BaseTwistTeleop(const rclcpp::NodeOptions & options)
   integer("axis_forward", s.axis_forward);
   integer("axis_lateral", s.axis_lateral);
   integer("axis_yaw", s.axis_yaw);
+  integer("axis_pitch", s.axis_pitch);
   integer("axis_enable", s.axis_enable);
   real("sign_forward", s.sign_forward);
   real("sign_lateral", s.sign_lateral);
   real("sign_yaw", s.sign_yaw);
+  real("sign_pitch", s.sign_pitch);
   real("sign_enable", s.sign_enable);
   real("scale_forward", s.scale_forward);
   real("scale_lateral", s.scale_lateral);
@@ -112,13 +114,15 @@ BaseTwistTeleop::BaseTwistTeleop(const rclcpp::NodeOptions & options)
   real("height_rate", s.height_rate);
   real("maximum_roll", s.maximum_roll);
   real("roll_rate", s.roll_rate);
+  real("maximum_pitch", s.maximum_pitch);
+  real("pitch_rate", s.pitch_rate);
   real("neutral_threshold", s.neutral_threshold);
   real("stick_exponent", s.stick_exponent);
   real("publish_rate", s.publish_rate);
   control_ = std::make_unique<TeleopControl>(s);
 
   publisher_ = create_publisher<ocs2_msgs::msg::WalkingVelocityCommand>(command_topic, bestEffort());
-  if (s.maximum_roll > 0.0 && !orientation_topic.empty()) {
+  if ((s.maximum_roll > 0.0 || s.maximum_pitch > 0.0) && !orientation_topic.empty()) {
     orientation_publisher_ = create_publisher<geometry_msgs::msg::Vector3>(orientation_topic, bestEffort());
   }
   const std::string source_topic = joy_source_topic.empty() ? joy_topic : joy_source_topic;
@@ -172,7 +176,7 @@ void BaseTwistTeleop::receiveMotionState(const std_msgs::msg::String::ConstShare
   motion_state_time_ = monotonic();
   if (message->data != "locomotion") {
     control_->stop("robot_" + message->data);
-    control_->resetRoll();
+    control_->resetOrientation();
   }
 }
 
@@ -202,6 +206,9 @@ void BaseTwistTeleop::receivePostureButton(const sensor_msgs::msg::Joy & message
     if (i >= 0 && std::abs(message.axes[i]) > s.neutral_threshold) {
       return;
     }
+  }
+  if (s.maximum_pitch > 0.0 && std::abs(message.axes[s.axis_pitch]) > s.neutral_threshold) {
+    return;
   }
   if (motion_state_ != "idle" && motion_state_ != "locomotion") {
     return;
@@ -302,7 +309,8 @@ void BaseTwistTeleop::publish()
   publisher_->publish(message);
   if (orientation_publisher_) {
     geometry_msgs::msg::Vector3 orientation;
-    orientation.x = command.roll;  // pitch (y) is not commanded yet
+    orientation.x = command.roll;
+    orientation.y = command.pitch;
     orientation_publisher_->publish(orientation);
   }
 

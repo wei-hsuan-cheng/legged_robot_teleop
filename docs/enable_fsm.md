@@ -3,7 +3,7 @@
 
 ## Permission States
 
-Only `ENABLED` can produce nonzero velocity/yaw or integrate D-pad height changes.
+Only `ENABLED` can produce nonzero velocity/yaw or integrate height, roll and pitch changes.
 The public `enabled` property is derived from this state, rather than maintained as another flag.
 The command topic, robot limits, speed fractions, height rate, and L2 thresholds are unchanged.
 
@@ -18,13 +18,15 @@ There is no release debounce delay; a released L2 immediately clears motion comm
 An unsafe enable attempt consumes that press, so simply centering a stick while L2 remains held cannot unexpectedly start motion.
 Release L2 and retry when the reported blocking input is clear.
 Malformed input and nonfinite/backward receipt or timer time also clear permission. Silent input does not: there is no input timeout.
-All non-enabled states clear cached motion and D-pad commands, preserving the selected height.
+All non-enabled states clear cached velocity, pitch-stick and D-pad inputs, preserving the selected height and tilt targets.
+For robots with `maximum_pitch > 0`, the right stick vertical axis must be neutral before arming, just like velocity axes.
+An absent or malformed enabled pitch axis clears permission; with `maximum_pitch: 0` it is not required and does not block arming.
 
 
 ## Center Interaction
 
 L1 Center is accepted only on a fresh button edge with L2 at or below its release threshold.
-It restores nominal height and leaves velocity/yaw zero through the existing command publisher.
+It restores nominal height, levels roll/pitch and leaves velocity/yaw zero through the existing command publishers.
 L1 presses while driving or partially pressing L2 are consumed without queueing a later reset.
 Circle is unassigned and does not affect motion permission or Center.
 Holding L1 blocks enabling, but does not erase the fact that L2 was physically released.

@@ -160,3 +160,21 @@ The controller side (per-leg posture, command frame, levelling) is in legged_rob
 58 tests pass (new: two gtest roll cases and a profile case); headless Upkie and Pineapple runs driven by synthetic Joy through this node rolled to 0.175 / 0.181 rad and back to level on L1.
 The physical DualSense was not tested.
 
+## Right-stick Pitch for OCS2 (2026-11-28)
+
+The user requested pitch in OCS2 first, leaving TurboMPC for later.
+Right stick vertical (SDL axis 3) integrates a pitch target with L2 enabled, bounded by `maximum_pitch` and rate-limited by `pitch_rate` (0.3 rad/s at full stick, signed-power shaping through `stick_exponent`).
+Positive stick/command leans forward in the command frame; centering the stick or releasing L2 holds the angle.
+L1 with L2 released levels roll and pitch and resets height; leaving locomotion also levels both axes.
+The enabled pitch stick must be neutral to arm L2 or toggle Square, and its axis must exist and be distinct from velocity/trigger axes.
+With `maximum_pitch: 0`, pitch is ignored and its axis is not required; the profile reads the limit from `ocs2.reference.maxBasePitch` (default 0).
+The existing best-effort Vector3 publisher now fills y with pitch and is created when either tilt axis is enabled.
+Only OCS2 Upkie/Pineapple YAMLs enable pitch (0.2 rad); no TurboMPC code/config/build was touched.
+Release builds of teleop and OCS2 legged MPC pass in `ros_jazzy`; all 63 teleop checks pass, including a real DDS pitch-only test with paused simulation clock and leveling outside locomotion.
+The first synthetic-joystick flat-ground tests at requested MPC 200 Hz passed on both robots: commanded +-0.2 rad tracks at about +-0.195 rad, combined roll/pitch remains balanced, L1 levels, and sit-down returns to idle.
+No optimizer dynamics, costs, constraints, posture table or CppAD model changed: the existing soft joint costs allow the MPC to choose its leg adjustment under pitch.
+The final repeat adds a physical 0.1 m/s command while holding combined tilt (the squared stick input is sqrt(0.1 / maxDisplacementVelocityX)).
+That repeat passed for both OCS2 robots, including L1 level and sit-down; all owned test processes were stopped afterward.
+The reproducible simulation harness and results are documented in the OCS2 repository's `docs/base_orientation_control.md` and `tests/base_orientation_test.py`.
+Physical DualSense operation, hardware, stepping with tilt and terrain with tilt remain untested.
+

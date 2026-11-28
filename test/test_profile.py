@@ -22,7 +22,8 @@ def test_profile_disables_sideways_drive(controllers):
     assert profile == {
         'reference_height': 0.22, 'minimum_height': 0.2, 'maximum_height': 0.33,
         'posture_controller': '', 'gait_topic': '', 'gait_cycle': '', 'gait_hold': '',
-        'maximum_roll': 0.0, 'orientation_topic': '/humanoid/base_orientation_command',
+        'maximum_roll': 0.0, 'maximum_pitch': 0.0,
+        'orientation_topic': '/humanoid/base_orientation_command',
     }
     assert not lateral
 
@@ -44,6 +45,20 @@ def test_roll_limit_and_topic_come_from_the_controller(controllers):
 def test_reference_height_override(controllers):
     profile, _ = load_robot_profile(controllers, 'controller', '0.3')
     assert profile['reference_height'] == 0.3
+
+
+def test_pitch_limit_comes_from_the_controller(controllers):
+    config = yaml.safe_load(controllers.read_text())
+    reference = config['controller']['ros__parameters']['ocs2']['reference']
+    reference['maxBasePitch'] = 0.2
+    controllers.write_text(yaml.safe_dump(config))
+    profile, _ = load_robot_profile(controllers, 'controller')
+    assert profile['maximum_pitch'] == 0.2
+    for invalid in (-0.1, float('nan'), float('inf')):
+        reference['maxBasePitch'] = invalid
+        controllers.write_text(yaml.safe_dump(config))
+        with pytest.raises(ValueError):
+            load_robot_profile(controllers, 'controller')
 
 
 def test_planned_stand_up_enables_posture_control(controllers):

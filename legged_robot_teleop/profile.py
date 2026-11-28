@@ -30,9 +30,13 @@ def load_robot_profile(path, controller_name, height_override=''):
     max_roll = float(reference.get('maxBaseRoll', 0.0) or 0.0)
     if not math.isfinite(max_roll) or max_roll < 0:
         raise ValueError('maxBaseRoll must be a finite nonnegative angle')
+    max_pitch = float(reference.get('maxBasePitch', 0.0) or 0.0)
+    if not math.isfinite(max_pitch) or max_pitch < 0:
+        raise ValueError('maxBasePitch must be a finite nonnegative angle')
     return {
         'reference_height': height,
         'maximum_roll': max_roll,
+        'maximum_pitch': max_pitch,
         'orientation_topic': parameters.get('target', {}).get(
             'baseOrientationTopic', '/humanoid/base_orientation_command'),
         'minimum_height': minimum,

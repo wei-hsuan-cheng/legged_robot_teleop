@@ -8,10 +8,12 @@ base_twist_teleop:
     axis_forward: 1
     axis_lateral: 0
     axis_yaw: 2
+    axis_pitch: 3 # Right stick forward/back: ramp trunk pitch while L2 is held.
     axis_enable: 4 # L2 trigger, not the L1 shoulder button.
     sign_forward: 1.0
     sign_lateral: 1.0
     sign_yaw: 1.0
+    sign_pitch: 1.0 # Forward stick leans forward (positive pitch in the command frame).
     sign_enable: -1.0 # game_controller_node reports L2 from 0 released to -1 pressed.
     enable_threshold: 0.5 # Engage at 50% of the ROS trigger range.
     release_threshold: 0.2 # Disengage at 20%; hysteresis prevents threshold chatter.
@@ -31,3 +33,4 @@ base_twist_teleop:
     button_gait_hold: 3 # Triangle (SDL Y): jump while held, in locomotion.
     height_rate: 0.2 # m/s; heights and bounds come from the robot controller YAML.
     roll_rate: 0.3 # rad/s; the roll limit (ocs2.reference.maxBaseRoll) comes from the robot controller YAML.
+    pitch_rate: 0.3 # rad/s at full stick; limit from ocs2.reference.maxBasePitch, 0 disables pitch.

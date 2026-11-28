@@ -124,3 +124,75 @@ def test_transport_with_no_simulation_clock(bridge, teleop_process):
         executor.shutdown()
         probe.destroy_node()
         context.shutdown()
+
+
+def test_pitch_only_publishes_orientation_and_levels_outside_locomotion(teleop_process):
+    pytest.importorskip('rclpy')
+    from geometry_msgs.msg import Vector3
+    from rclpy.context import Context
+    from rclpy.executors import SingleThreadedExecutor
+    from rclpy.node import Node
+    from rclpy.qos import qos_profile_sensor_data
+    from sensor_msgs.msg import Joy
+    from std_msgs.msg import String
+
+    context = Context()
+    context.init(domain_id=DOMAIN_ID)
+    suffix = '/teleop_test/pitch_' + uuid4().hex
+    teleop_process(
+        '-p', 'joy_topic:=' + suffix + '/joy',
+        '-p', 'orientation_topic:=' + suffix + '/orientation',
+        '-p', 'posture_controller:=' + suffix + '/controller',
+        '-p', 'maximum_pitch:=0.2', '-p', 'pitch_rate:=0.3',
+        '-p', 'use_sim_time:=true',
+    )
+    probe = Node('pitch_probe_' + uuid4().hex, context=context)
+    joy = probe.create_publisher(Joy, suffix + '/joy', qos_profile_sensor_data)
+    phase = probe.create_publisher(
+        String, suffix + '/controller/motion_state', qos_profile_sensor_data,
+    )
+    received = []
+    probe.create_subscription(
+        Vector3, suffix + '/orientation', received.append, qos_profile_sensor_data,
+    )
+    executor = SingleThreadedExecutor(context=context)
+    executor.add_node(probe)
+
+    def pump(duration, pressure=0.0, pitch=0.0, center=False, state='locomotion'):
+        end = time.monotonic() + duration
+        next_send = 0.0
+        while time.monotonic() < end:
+            if time.monotonic() >= next_send:
+                message = Joy()
+                message.axes = [0.0, 0.0, 0.0, pitch, -pressure, 0.0]
+                message.buttons = [int(i == 9 and center) for i in range(15)]
+                phase.publish(String(data=state))
+                joy.publish(message)
+                next_send = time.monotonic() + 0.02
+            executor.spin_once(timeout_sec=0.005)
+
+    try:
+        wait_for(executor, lambda: received and joy.get_subscription_count(), what='pitch startup')
+        pump(0.3)
+        pump(0.1, pressure=1.0)
+        pump(0.3, pressure=1.0, pitch=1.0)
+        assert 0.03 < received[-1].y <= 0.2
+        assert received[-1].x == received[-1].z == 0.0
+        pump(0.1)
+        held = received[-1].y
+        pump(0.1)
+        assert received[-1].y == held
+        pump(0.1, center=True)
+        assert received[-1].y == 0.0
+        pump(0.1)
+        pump(0.1, pressure=1.0)
+        pump(0.3, pressure=1.0, pitch=-1.0)
+        assert received[-1].y < -0.03
+        pump(0.2, state='sitting down')
+        assert received[-1].y == 0.0
+        info = probe.get_publishers_info_by_topic(suffix + '/orientation')
+        assert info[0].qos_profile.reliability == qos_profile_sensor_data.reliability
+    finally:
+        executor.shutdown()
+        probe.destroy_node()
+        context.shutdown()

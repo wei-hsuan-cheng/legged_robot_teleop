@@ -233,7 +233,7 @@ TEST(Control, RollLimitsCenterAndReset)
   receive(control, sample({14}, stick(0), 1.0), 3.4);
   control.command(3.42);
   EXPECT_GT(control.roll(), 0.0);
-  control.resetRoll();
+  control.resetOrientation();
   EXPECT_EQ(control.roll(), 0.0);
 }
 
@@ -246,6 +246,67 @@ TEST(Control, RollButtonsAreIgnoredWithoutARollLimit)
     EXPECT_TRUE(control.enabled());
     EXPECT_EQ(control.command(0.02 * i).roll, 0.0);
   }
+}
+
+TEST(Control, PitchLimitsHoldCenterAndReset)
+{
+  TeleopControl control{with([](Settings & s) {
+      s.maximum_pitch = 0.2; s.pitch_rate = 0.5; s.stick_exponent = 2.0;
+    })};
+  arm(control);
+  auto input = sample({}, stick(0), 1.0);
+  input.axes[3] = 0.5;
+  receive(control, input, 0.02);
+  EXPECT_NEAR(control.command(0.03).pitch, 0.0025, 1e-12);
+  input.axes[3] = 1.0;
+  for (int i = 2; i < 60; ++i) {
+    receive(control, input, 0.02 * i);
+    control.command(0.02 * i);
+  }
+  EXPECT_DOUBLE_EQ(control.pitch(), 0.2);
+  receive(control, sample({}, stick(0), 1.0), 1.2);
+  EXPECT_DOUBLE_EQ(control.command(1.22).pitch, 0.2) << "Neutral stick holds pitch";
+  receive(control, sample(), 1.23);
+  EXPECT_DOUBLE_EQ(control.command(1.24).pitch, 0.2) << "Released L2 holds pitch";
+  receive(control, sample({9}), 1.25);
+  EXPECT_DOUBLE_EQ(control.command(1.26).pitch, 0.0);
+  arm(control, 1.27);
+  input.axes[3] = -1.0;
+  for (int i = 1; i < 60; ++i) {
+    receive(control, input, 1.3 + 0.02 * i);
+    control.command(1.3 + 0.02 * i);
+  }
+  EXPECT_DOUBLE_EQ(control.pitch(), -0.2);
+  EXPECT_DOUBLE_EQ(control.roll(), 0.0);
+  EXPECT_DOUBLE_EQ(control.height(), control.settings().reference_height);
+  control.resetOrientation();
+  EXPECT_DOUBLE_EQ(control.pitch(), 0.0);
+}
+
+TEST(EnableFsm, PitchMustBeCenteredToArmOnlyWhenEnabled)
+{
+  for (const double limit : {0.0, 0.2}) {
+    TeleopControl control{with([&](Settings & s) {s.maximum_pitch = limit;})};
+    receive(control, sample(), 0.0);
+    auto input = sample({}, stick(0), 1.0);
+    input.axes[3] = 0.4;
+    receive(control, input, 0.01);
+    EXPECT_EQ(control.enabled(), limit == 0.0);
+    if (limit > 0.0) {
+      EXPECT_EQ(control.state(), "enable_blocked_sticks_not_centered");
+      arm(control, 0.02);
+    }
+  }
+}
+
+TEST(Control, PitchAxisRequiredOnlyWithPitchEnabled)
+{
+  TeleopControl disabled{with([](Settings & s) {s.axis_pitch = 20;})};
+  arm(disabled);
+  EXPECT_DOUBLE_EQ(disabled.command(0.02).pitch, 0.0);
+  TeleopControl enabled{with([](Settings & s) {s.axis_pitch = 20; s.maximum_pitch = 0.2;})};
+  receive(enabled, sample(), 0.0);
+  EXPECT_EQ(enabled.state(), "invalid_input");
 }
 
 TEST(Control, BothHeightButtonsCancelAndDisabledHeightIsIgnored)
@@ -299,6 +360,13 @@ TEST(Control, InvalidSettingsFailFast)
     [](Settings & s) {s.release_threshold = -0.1;},
     [](Settings & s) {s.axis_enable = 1;},
     [](Settings & s) {s.sign_enable = 0.0;},
+    [](Settings & s) {s.maximum_pitch = -0.1;},
+    [](Settings & s) {s.maximum_pitch = std::numeric_limits<double>::quiet_NaN();},
+    [](Settings & s) {s.pitch_rate = 0.0;},
+    [](Settings & s) {s.sign_pitch = 0.0;},
+    [](Settings & s) {s.maximum_pitch = 0.2; s.axis_pitch = s.axis_enable;},
+    [](Settings & s) {s.maximum_pitch = 0.2; s.axis_pitch = s.axis_yaw;},
+    [](Settings & s) {s.maximum_pitch = 0.2; s.axis_pitch = -1;},
   };
   for (std::size_t i = 0; i < changes.size(); ++i) {
     EXPECT_THROW(TeleopControl{with(changes[i])}, std::invalid_argument) << "case " << i;
